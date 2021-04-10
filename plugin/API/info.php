@@ -20,7 +20,9 @@ $reflector = new ReflectionClass('API');
 <!DOCTYPE html>
 <html lang="<?php echo $_SESSION['language']; ?>">
     <head>
-        <title><?php echo $config->getWebSiteTitle(); ?>  :: API</title>
+        <?php
+        echo getHTMLTitle(__("API"));
+        ?>
         <?php
         include $global['systemRootPath'] . 'view/include/head.php';
         ?>
@@ -56,7 +58,7 @@ $reflector = new ReflectionClass('API');
                     <details>
                         <summary style="cursor: pointer;"><i class="fas fa-file-upload"></i> Upload a Video</summary>
                         <br>
-                        For more detailed instructions please <a href="https://github.com/WWBN/AVideo/wiki/Upload-videos-from-third-party-applications" target="_blank">read this</a>
+                        For more detailed instructions please <a href="https://github.com/WWBN/AVideo/wiki/Upload-videos-from-third-party-applications" target="_blank" rel="noopener noreferrer" >read this</a>
                         <br>
                         Your HTML Form should looks like this. The user and the pass values on the action URL will be the video owner
                         <pre><?php
@@ -71,7 +73,7 @@ $reflector = new ReflectionClass('API');
                             ?>
                         </pre>
 
-                        You can get notified for the new video uploads with the Webhook in the Notification plugin, Check <a href="https://github.com/WWBN/AVideo/wiki/Notifications-Plugin#webhooks" target="_blank">here</a> for more details
+                        You can get notified for the new video uploads with the Webhook in the Notification plugin, Check <a href="https://github.com/WWBN/AVideo/wiki/Notifications-Plugin#webhooks" target="_blank" rel="noopener noreferrer">here</a> for more details
 
                     </details> 
                 </li>
@@ -91,7 +93,7 @@ $reflector = new ReflectionClass('API');
                                 preg_match_all('#\bhttps?://[^,\s()<>]+(?:\([\w\d]+\)|([^,[:punct:]\s]|/))#', $comment, $match2);
                                 //var_dump($match2[0]);
                                 $link = "<a target='_blank' href='{$match2[0][0]}'>" . htmlentities($match2[0][0]) . "</a>";
-                                $comment = str_replace(array($match2[0][0],"     *"), array($link,"*"), $comment);
+                                $comment = str_replace(array($match2[0][0], "     *"), array($link, "*"), $comment);
 
                                 echo ($comment);
                                 //{webSiteRootURL}plugin/API/{getOrSet}.json.php?name={name}

@@ -10,6 +10,10 @@ use Vimeo\Exceptions\VimeoUploadException;
 
 class VimeoAPI extends PluginAbstract {
 
+    public function getTags() {
+        return array(
+        );
+    }
     public function getDescription() {
         $txt = "Upload your videos to Vimeo using the Vimeo API.<br>";
         $txt .= "<a href='https://developer.vimeo.com/apps/'>Create an APP and get your credentials here</a><br>";
@@ -164,9 +168,9 @@ class VimeoAPI extends PluginAbstract {
                                         type: 'post',
                                         success: function (response) {
                                             if(response.error){
-                                                swal('" . __("Sorry!") . "', response.msg, 'error');
+                                                avideoAlert('" . __("Sorry!") . "', response.msg, 'error');
                                             }else{
-                                                swal('" . __("Congratulations!") . "', response.msg, 'success');
+                                                avideoAlert('" . __("Congratulations!") . "', response.msg, 'success');
                                             }
                                             console.log(response);
                                             modal.hidePleaseWait();
@@ -179,21 +183,21 @@ class VimeoAPI extends PluginAbstract {
                                         url: '{$global['webSiteRootURL']}plugin/VimeoAPI/uploadAll.json.php',
                                         success: function (response) {
                                             if(response.error){
-                                                swal('" . __("Sorry!") . "', response.msg, 'error');
+                                                avideoAlert('" . __("Sorry!") . "', response.msg, 'error');
                                             }else{
-                                                swal('" . __("Congratulations!") . "', response.msg, 'success');
+                                                avideoAlert('" . __("Congratulations!") . "', response.msg, 'success');
                                             }
                                             console.log(response);
                                         }
                                     });
-                swal('" . __("Process Start") . "', 'It may take a while', 'warning');                    
+                avideoAlert('" . __("Process Start") . "', 'It may take a while', 'warning');                    
                 }</script>";
         }
         return $js;
     }
 
     public function getVideosManagerListButton() {
-        $btn = '<br><button type="button" class="btn btn-default btn-light btn-sm btn-xs " onclick="vimeoUpload(\' + row.id + \');" data-row-id="right"  data-toggle="tooltip" data-placement="left" title="Upload to Vimeo"><i class="fab fa-vimeo-v"></i> Upload</button>';
+        $btn = '<button type="button" class="btn btn-default btn-light btn-sm btn-xs  btn-block" onclick="vimeoUpload(\' + row.id + \');" data-row-id="right"  data-toggle="tooltip" data-placement="left" title="Upload to Vimeo"><i class="fab fa-vimeo-v"></i> Upload</button>';
         return $btn;
     }
 
