@@ -1,29 +1,27 @@
 <?php
-
 global $global, $config;
 if (!isset($global['systemRootPath'])) {
     require_once '../videos/configuration.php';
 }
 require_once $global['systemRootPath'] . 'objects/video.php';
 
-if(empty($_GET['video_id']) && !empty($_POST['videos_id'])){
-    $_GET['video_id'] = $_POST['videos_id'];
-}
 
 $obj = new stdClass();
 $obj->error = true;
-if (!Video::canEdit($_GET['video_id'])) {
-    $obj->msg = 'You cant edit this file';
+$obj->users_id = User::getId();
+$obj->videos_id = intval($_REQUEST['video_id']);
+if (!Video::canEdit($obj->videos_id)) {
+    $obj->msg = 'You can\'t edit this file';
     die(json_encode($obj));
 }
-$obj->videos_id = intval($_GET['video_id']);
+$obj->videos_id = intval($obj->videos_id);
 
 header('Content-Type: application/json');
 // A list of permitted file extensions
-$allowed = array('jpg', 'gif', 'pjpg', 'pgif', 'webp');
+$allowed = ['jpg', 'jpeg', 'gif', 'pjpg', 'pgif', 'webp', 'png', 'bmp'];
 if (!in_array(strtolower($_GET['type']), $allowed)) {
     $obj->msg = "UploadPoster FIle extension not allowed";
-    _error_log($obj->msg );
+    _error_log($obj->msg);
     die(json_encode($obj));
 }
 if (isset($_FILES['file_data']) && $_FILES['file_data']['error'] == 0) {
@@ -33,16 +31,22 @@ if (isset($_FILES['file_data']) && $_FILES['file_data']['error'] == 0) {
         die(json_encode($obj));
     }
     //var_dump($extension, $type);exit;
-    $video = new Video("", "", $_GET['video_id']);
+    $video = new Video("", "", $obj->videos_id, true);
     if (!empty($video)) {
         $ext = ".jpg";
         switch ($_GET['type']) {
             case "jpg":
             case "jpeg":
                 $ext = ".jpg";
+                if ($extension == 'png' || $extension == 'bmp') {
+                    $ext = "_convertToJPG.{$extension}";
+                }
                 break;
             case "pjpg":
                 $ext = "_portrait.jpg";
+                if ($extension == 'png' || $extension == 'bmp') {
+                    $ext = "_portrait_convertToJPG.{$extension}";
+                }
                 break;
             case "gif":
                 $ext = ".gif";
@@ -57,17 +61,27 @@ if (isset($_FILES['file_data']) && $_FILES['file_data']['error'] == 0) {
         /**
          * This is when is using in a non file_dataoaded movie
          */
-        $destination = "{$global['systemRootPath']}videos/" . $video->getFilename() . $ext;
+        $paths = Video::getPaths($video->getFilename(), true);
+        $destination = $paths['path'] . $video->getFilename() . $ext;
         _error_log("Try to move " . $destination . " \n " . print_r($video, true));
         if (!move_uploaded_file($_FILES['file_data']['tmp_name'], $destination)) {
-            $obj->msg = "Error on move_file_uploaded_file(" . $_FILES['file_data']['tmp_name'] . ", " . "{$global['systemRootPath']}videos/" . $filename . $ext;
+            $obj->msg = "Error on move_file_uploaded_file(" . $_FILES['file_data']['tmp_name'] . ", " . $destination;
             die(json_encode($obj));
         } else {
+            if (preg_match('/_convertToJPG/', $ext)) {
+                $new_destination = str_replace('_convertToJPG.' . $extension, '.jpg', $destination);
+                if (convertImage($destination, $new_destination, 100)) {
+                    unlink($destination);
+                }
+            }
             // delete thumbs from poster
             Video::deleteThumbs($video->getFilename());
         }
-        $obj->error = false;
-        echo "{}";
+        Video::clearCache($obj->videos_id, true);
+        $obj->clearFirstPageCache = clearFirstPageCache();
+        unset($obj->error);
+        die(json_encode($obj));
+        echo '{}';
         exit;
     } else {
         $obj->msg = "Video Not found";

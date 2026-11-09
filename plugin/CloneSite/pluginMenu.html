@@ -1,10 +1,10 @@
-<a href="#" onclick="document.location=webSiteRootURL+'plugin/CloneSite/'" class="btn btn-primary btn-xs btn-block"><i class="fas fa-clone"></i> Clones Manager</a>
+<button onclick="avideoModalIframe(webSiteRootURL+'plugin/CloneSite/');" class="btn btn-primary btn-xs btn-block"><i class="fas fa-clone"></i> Clones Manager</button>
 <button class="btn btn-success btn-xs btn-block" id="cloneNow" onclick="
         //modal.showPleaseWait();
         $('#cloneProgressModal').modal();
         function getClientLog(){
             $.ajax({
-                url: webSiteRootURL+'videos/cache/clones/client.log'
+                url: webSiteRootURL+'plugin/CloneSite/client.log.php'
             }).done(function (resp) {
                 $('#cloneLog').text(resp);
                 var $target = $('#cloneLog');
@@ -20,9 +20,9 @@
 
         }).done(function (resposta) {
             if (resposta.error) {
-                swal('Sorry', resposta.msg, 'error');
+                avideoAlert('Sorry', resposta.msg, 'error');
             }else{
-                swal('Congratulations', 'Your Clone Process is finished', 'success');
+                avideoAlert('Congratulations', 'Your Clone Process is finished', 'success');
             }
             clearInterval(interval);
             getClientLog();

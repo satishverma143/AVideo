@@ -1,468 +1,90 @@
-
-<div class="row dashboard">
-    <div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-        <div class="panel panel-blue">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-xs-3">
-                        <i class="fa fa-play-circle fa-5x"></i>
-                    </div>
-                    <div class="col-xs-9 text-right">
-                        <div class="huge loading" id="totalVideos">0</div>
-                        <div><?php echo __("Total Videos"); ?></div>
-                    </div>
-                </div>
-            </div>
-            <a href="<?php echo $global['webSiteRootURL']; ?>mvideos">
-                <div class="panel-footer">
-                    <span class="pull-left"><?php echo __("View Details"); ?></span>
-                    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-                    <div class="clearfix"></div>
-                </div>
-            </a>
+<?php
+$reportMetrics = [
+    ['totalVideos', 'totalVideos', 'Videos', 'fa-play-circle', 'mvideos'],
+    ['totalVideosViews', 'totalVideosViews', 'Video views', 'fa-eye', 'mvideos'],
+    ['totalDurationVideos', 'totalDurationVideos', 'Video duration (minutes)', 'fa-clock', 'mvideos'],
+    ['totalSubscriptions', 'totalSubscriptions', 'Active subscriptions', 'fa-user-plus', 'subscribes'],
+    ['totalVideosComents', 'totalComents', 'Comments', 'fa-comments', 'comments'],
+    ['totalVideosLikes', 'totalLikes', 'Recorded video likes', 'fa-thumbs-up', 'mvideos'],
+    ['totalVideosDislikes', 'totalDislikes', 'Recorded video dislikes', 'fa-thumbs-down', 'mvideos']
+];
+if (User::isAdmin()) {
+    array_unshift($reportMetrics, ['totalUsers', 'totalUsers', 'Users', 'fa-users', 'users']);
+}
+?>
+<header class="report-section-heading">
+    <h2><?php echo __('Performance at a glance'); ?></h2>
+    <p class="text-muted"><?php echo User::isAdmin() ? __('Current totals across the site. Online users updates live; other figures may take up to five minutes to update.') : __('Current totals for your channel. Figures may take up to five minutes to update.'); ?></p>
+    <p class="help-block"><?php echo __('Video views use accumulated display counters. Dated reports count retained viewing sessions, so their totals can differ after statistics cleanup. Reactions count current recorded votes; users include active and inactive accounts. Subscriptions exclude artificial display adjustments.'); ?></p>
+</header>
+<div class="metric-grid">
+    <?php if (User::isAdmin()) { ?>
+        <div class="panel panel-default"><div class="panel-body"><i class="fas fa-user-friends report-metric-icon" aria-hidden="true"></i><div class="huge total_devices_online" id="total_users_online">&mdash;</div><span><?php echo __('Online users (by device)'); ?></span></div></div>
+    <?php } ?>
+    <?php foreach ($reportMetrics as $metric) { ?>
+        <div class="panel panel-default">
+            <div class="panel-body"><i class="fas <?php echo $metric[3]; ?> report-metric-icon" aria-hidden="true"></i><div class="huge" id="<?php echo $metric[0]; ?>">&mdash;</div><span><?php echo __($metric[2]); ?></span></div>
+            <a class="panel-footer" href="<?php echo $global['webSiteRootURL'] . $metric[4]; ?>"><?php echo __('View Details'); ?> <i class="fa fa-angle-right" aria-hidden="true"></i></a>
         </div>
-    </div>
-    <div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-        <div class="panel panel-primary">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-xs-3">
-                        <i class="fa fa-eye fa-5x"></i>
-                    </div>
-                    <div class="col-xs-9 text-right">
-                        <div class="huge loading" id="totalVideosViews">0</div>
-                        <div><?php echo __("Total Videos Views"); ?></div>
-                    </div>
-                </div>
-            </div>
-            <a href="<?php echo $global['webSiteRootURL']; ?>mvideos">
-                <div class="panel-footer">
-                    <span class="pull-left"><?php echo __("View Details"); ?></span>
-                    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-                    <div class="clearfix"></div>
-                </div>
-            </a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-        <div class="panel panel-purple">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-xs-3">
-                        <i class="fa fa-users fa-5x"></i>
-                    </div>
-                    <div class="col-xs-9 text-right">
-                        <div class="huge loading" id="totalUsers">0</div>
-                        <div><?php echo __("Total Users"); ?></div>
-                    </div>
-                </div>
-            </div>
-            <a href="<?php echo $global['webSiteRootURL']; ?>users">
-                <div class="panel-footer">
-                    <span class="pull-left"><?php echo __("View Details"); ?></span>
-                    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-                    <div class="clearfix"></div>
-                </div>
-            </a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-        <div class="panel panel-wine">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-xs-3">
-                        <i class="fa fa-user-plus fa-5x"></i>
-                    </div>
-                    <div class="col-xs-9 text-right">
-                        <div class="huge loading" id="totalSubscriptions">0</div>
-                        <div><?php echo __("Total Subscriptions"); ?></div>
-                    </div>
-                </div>
-            </div>
-            <a href="<?php echo $global['webSiteRootURL']; ?>subscribes">
-                <div class="panel-footer">
-                    <span class="pull-left"><?php echo __("View Details"); ?></span>
-                    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-                    <div class="clearfix"></div>
-                </div>
-            </a>
-        </div>
-    </div>
-
-
-    <div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-        <div class="panel panel-red">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-xs-3">
-                        <i class="fa fa-comments fa-5x"></i>
-                    </div>
-                    <div class="col-xs-9 text-right">
-                        <div class="huge loading" id="totalVideosComents">0</div>
-                        <div><?php echo __("Total Video Comments"); ?></div>
-                    </div>
-                </div>
-            </div>
-            <a href="<?php echo $global['webSiteRootURL']; ?>comments">
-                <div class="panel-footer">
-                    <span class="pull-left"><?php echo __("View Details"); ?></span>
-                    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-                    <div class="clearfix"></div>
-                </div>
-            </a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-        <div class="panel panel-orange">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-xs-3">
-                        <i class="fa fa-thumbs-o-up fa-5x"></i>
-                    </div>
-                    <div class="col-xs-9 text-right">
-                        <div class="huge loading" id="totalVideosLikes">0</div>
-                        <div><?php echo __("Total Videos Likes"); ?></div>
-                    </div>
-                </div>
-            </div>
-            <a href="<?php echo $global['webSiteRootURL']; ?>mvideos">
-                <div class="panel-footer">
-                    <span class="pull-left"><?php echo __("View Details"); ?></span>
-                    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-                    <div class="clearfix"></div>
-                </div>
-            </a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-        <div class="panel panel-yellow">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-xs-3">
-                        <i class="fa fa-thumbs-o-down fa-5x"></i>
-                    </div>
-                    <div class="col-xs-9 text-right">
-                        <div class="huge loading" id="totalVideosDislikes">0</div>
-                        <div><?php echo __("Total Videos Dislikes"); ?></div>
-                    </div>
-                </div>
-            </div>
-            <a href="<?php echo $global['webSiteRootURL']; ?>mvideos">
-                <div class="panel-footer">
-                    <span class="pull-left"><?php echo __("View Details"); ?></span>
-                    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-                    <div class="clearfix"></div>
-                </div>
-            </a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-4 col-sm-6 col-xs-12">
-        <div class="panel panel-green">
-            <div class="panel-heading">
-                <div class="row">
-                    <div class="col-xs-3">
-                        <i class="far fa-clock fa-5x"></i>
-                    </div>
-                    <div class="col-xs-9 text-right">
-                        <div class="huge loading" id="totalDurationVideos">0</div>
-                        <div><?php echo __("Total Duration Videos (Minutes)"); ?></div>
-                    </div>
-                </div>
-            </div>
-            <a href="<?php echo $global['webSiteRootURL']; ?>mvideos">
-                <div class="panel-footer">
-                    <span class="pull-left"><?php echo __("View Details"); ?></span>
-                    <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
-                    <div class="clearfix"></div>
-                </div>
-            </a>
-        </div>
-    </div>
+    <?php } ?>
 </div>
-<nav class="navbar navbar-default nav-chart">
-    <div class="container-fluid">
-        <div class="btn-group">
-            <button class="btn btn-primary navbar-btn active" id="btnAll" ><?php echo __("Total Views"); ?></button>
-            <button class="btn btn-warning navbar-btn" id="btnToday"><?php echo __("Today Views"); ?></button>
-            <button class="btn btn-default navbar-btn" id="btn7"><?php echo __("Last 7 Days"); ?></button>
-            <button class="btn btn-default navbar-btn" id="btn30" ><?php echo __("Last 30 Days"); ?></button>
-            <!--
-            <button class="btn btn-default navbar-btn" id="btnUnique" ><?php echo __("Unique Users"); ?></button>
-            --></div>
-    </div>
-</nav>
-<div class="col-md-3">
-
-    <div class="panel panel-default">
-        <div class="panel-heading when"><?php echo __("Color Legend"); ?></div>
-        <div class="panel-body" style="height: 600px; overflow-y: scroll;">
-            <div class="list-group">
-
-                <?php
-                foreach ($labelsFull as $key => $value) {
-                    ?>
-                    <a class="list-group-item " style="border-color: <?= $bg[$key] ?>; border-width: 1px 20px 1px 5px; font-size: 0.9em;">
-                        <?= $value ?>
-                    </a>
-                    <?php
-                }
-                ?>
-            </div>
+<section class="panel panel-default" id="report0ChartsContainer">
+    <div class="panel-heading report-page-heading">
+        <div><h2><?php echo __('Most watched videos'); ?></h2><p><?php echo __('Ranked by recorded views in the selected rolling period. Views are not unique viewers.'); ?></p></div>
+        <div class="report-actions">
+            <label for="overviewPeriod" class="sr-only"><?php echo __('Period'); ?></label>
+            <select class="form-control" id="overviewPeriod">
+                <?php foreach (['today' => 'Last 24 hours', 'last7Days' => 'Last 7 Days', 'last15Days' => 'Last 15 Days', 'last30Days' => 'Last 30 Days', 'last90Days' => 'Last 90 Days'] as $key => $label) { ?>
+                    <option value="<?php echo $key; ?>" <?php echo $key === 'last30Days' ? 'selected' : ''; ?>><?php echo __($label); ?></option>
+                <?php } ?>
+            </select>
+            <button type="button" class="btn btn-default" id="refreshOverview"><i class="fa fa-refresh" aria-hidden="true"></i> <?php echo __('Refresh'); ?></button>
         </div>
     </div>
-</div>
-<div class="col-md-9">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="panel panel-default">
-                <div class="panel-heading when"># <?php echo __("Total Views"); ?></div>
-                <div class="panel-body">
-                    <canvas id="myChart" height="60" ></canvas>
-                </div>
-            </div>
-        </div>
+    <div class="panel-body">
+        <p id="overviewStatus" role="status" aria-live="polite"></p>
+        <div class="report-chart-body"><canvas id="overviewChart" role="img" aria-label="<?php echo __('Most watched videos'); ?>"></canvas></div>
+        <details><summary><?php echo __('View data'); ?></summary><div class="table-responsive"><table class="table table-striped"><thead><tr><th><?php echo __('Video'); ?></th><th class="text-right"><?php echo __('Views'); ?></th></tr></thead><tbody id="overviewData"></tbody></table></div></details>
     </div>
-    <div class="row">
-        <div class="col-md-4">
-            <div class="panel panel-default">
-                <div class="panel-heading when"># <?php echo __("Total Views"); ?></div>
-                <div class="panel-body">
-                    <canvas id="myChartPie" height="200"  ></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-8">
-            <div class="panel panel-default">
-                <div class="panel-heading when"># <?php echo __("Timeline"); ?></div>
-                <div class="panel-body" id="timeline">
-                    <canvas id="myChartLine" height="90"  ></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="row">
-        <div class="col-md-12">
-            <div class="panel panel-default">
-                <div class="panel-heading when"># <?php echo __("Total Views Today"), " - ", date("Y-m-d"); ?></div>
-                <div class="panel-body">
-                    <canvas id="myChartLineToday" height="60" ></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+</section>
+<div class="row"><?php include $global['systemRootPath'] . 'view/report4.php'; ?></div>
 <script>
-
-    function countTo(selector, total) {
-        current = parseInt($(selector).text());
-        total = parseInt(total);
-        if (!total || current >= total) {
-            $(selector).removeClass('loading');
-            return;
-        }
-        var rest = (total - current);
-        var step = parseInt(rest / 100);
-        if (step < 1) {
-            step = 1;
-        }
-        current += step;
-        $(selector).text(current);
-        var timeout = (500 / rest);
-        setTimeout(function () {
-            countTo(selector, total);
-        }, timeout);
+$(function () {
+    var response, canvas = document.getElementById('overviewChart'), status = $('#overviewStatus');
+    function draw() {
+        if (!response) { return; }
+        var period = response[$('#overviewPeriod').val()];
+        var videos = period && Array.isArray(period.videos) ? period.videos : [];
+        $('#overviewData').empty();
+        videos.forEach(function (video) {
+            $('<tr>').append($('<td>').text(video.title || video.clean_title)).append($('<td class="text-right">').text(Number(video.total_views).toLocaleString())).appendTo('#overviewData');
+        });
+        var labels = videos.map(function (video) { return video.title || video.clean_title; });
+        AVideoReports.chart(canvas, labels.map(function (label) { return label.length > 38 ? label.slice(0, 35) + '\u2026' : label; }), [{label: <?php echo json_encode(__('Views')); ?>, data: videos.map(function (video) { return Number(video.total_views) || 0; })}], {horizontal: true, fullLabels: labels});
+        $(canvas).parent().toggle(videos.length > 0);
+        $('#report0ChartsContainer details').toggle(videos.length > 0);
+        status.removeClass('text-danger').text(videos.length ? <?php echo json_encode(__('Showing the top videos for this period.')); ?> : <?php echo json_encode(__('No views recorded in this period. Try a longer period.')); ?>);
     }
-
-    var ctx = document.getElementById("myChart");
-    var ctxPie = document.getElementById("myChartPie");
-    var ctxLine = document.getElementById("myChartLine");
-    var ctxLineToday = document.getElementById("myChartLineToday");
-    var chartData = {
-        labels: <?php echo json_encode($labelsFull); ?>,
-        datasets: [{
-                label: '# <?php echo __("Total Views"); ?>',
-                data: <?php echo json_encode($datas); ?>,
-                backgroundColor: <?php echo json_encode($bg); ?>,
-                borderColor: <?php echo json_encode($bc); ?>,
-                borderWidth: 1
-            }]
-    };
-
-    var lineChartData = {
-        labels: <?php echo json_encode($label90Days); ?>,
-        datasets: [{
-                backgroundColor: 'rgba(255, 0, 0, 0.3)',
-                borderColor: 'rgba(255, 0, 0, 0.5)',
-                label: '# <?php echo __("Total Views (90 Days)"); ?>',
-                data: <?php echo json_encode($statistc_last90Days); ?>
-            }]
-    };
-
-    var lineChartDataToday = {
-        labels: <?php echo json_encode($labelToday); ?>,
-        datasets: [{
-                backgroundColor: 'rgba(0, 0, 255, 0.3)',
-                borderColor: 'rgba(0, 0, 255, 0.5)',
-                label: '# <?php echo __("Total Views (Today)"); ?>',
-                data: <?php echo json_encode($statistc_lastToday); ?>
-            }]
-    };
-
-    var myChart = new Chart(ctx, {
-        type: 'bar',
-        data: chartData,
-        options: {
-            scales: {
-                yAxes: [{
-                        ticks: {
-                            beginAtZero: true,
-                            callback: function (value, index, values) {
-                                if (Math.floor(value) === value) {
-                                    return value;
-                                }
-                            }
-                        }
-                    }],
-                xAxes: [{
-                        display: false
-                    }]
-            },
-            legend: {
-                display: false
-            },
-            responsive: true
+    function load() {
+        $('#refreshOverview').prop('disabled', true); AVideoReports.busy(true);
+        status.removeClass('text-danger').text(<?php echo json_encode(__('Loading...')); ?>);
+        function failed() {
+            response = null; $('#overviewData').empty(); $(canvas).parent().hide();
+            $('#report0ChartsContainer details').hide();
+            <?php foreach ($reportMetrics as $metric) { ?>$('#<?php echo $metric[0]; ?>').text('\u2014');<?php } ?>
+            status.addClass('text-danger').text(<?php echo json_encode(__('Unable to load the overview. Select Refresh to try again.')); ?>);
         }
-    });
-    var myChartPie = new Chart(ctxPie, {
-        type: 'pie',
-        data: chartData,
-        options: {
-            legend: {
-                display: false
-            },
-            responsive: true
-        }
-    });
-
-    var myChartLine = new Chart(ctxLine, {
-        type: 'line',
-        data: lineChartData,
-        fill: false,
-        options: {
-            scales: {
-                yAxes: [{
-                        ticks: {
-                            beginAtZero: true,
-                            callback: function (value, index, values) {
-                                if (Math.floor(value) === value) {
-                                    return value;
-                                }
-                            }
-                        }
-                    }]
-            },
-            legend: {
-                display: false
-            },
-            responsive: true,
-            title: {
-                display: true
-            }
-        }
-    });
-
-    var myChartLineToday = new Chart(ctxLineToday, {
-        type: 'line',
-        data: lineChartDataToday,
-        fill: false,
-        options: {
-            scales: {
-                yAxes: [{
-                        ticks: {
-                            beginAtZero: true,
-                            callback: function (value, index, values) {
-                                if (Math.floor(value) === value) {
-                                    return value;
-                                }
-                            }
-                        }
-                    }]
-            },
-            legend: {
-                display: false
-            },
-            responsive: true,
-            title: {
-                display: true
-            }
-        }
-    });
-
-    $(document).ready(function () {
-        countTo('#totalVideos', <?php echo $totalVideos; ?>);
-        countTo('#totalUsers', <?php echo $totalUsers; ?>);
-        countTo('#totalSubscriptions', <?php echo $totalSubscriptions; ?>);
-        countTo('#totalVideosComents', <?php echo $totalComents; ?>);
-        countTo('#totalVideosLikes', <?php echo $totalInfos->likes; ?>);
-        countTo('#totalVideosDislikes', <?php echo $totalInfos->disLikes; ?>);
-        countTo('#totalVideosViews', <?php echo $totalInfos->views_count; ?>);
-        countTo('#totalDurationVideos', <?php echo $totalInfos->total_minutes; ?>);
-
-        $('#btnAll').click(function () {
-            $('.nav-chart .btn').removeClass('active');
-            $(this).addClass('active');
-            chartData.datasets[0].data = <?php echo json_encode($datas); ?>;
-            chartData.datasets[0].label = '# <?php echo __("Total Views"); ?>';
-            lineChartData.labels = <?php echo json_encode($label90Days); ?>;
-            lineChartData.datasets[0].data = <?php echo json_encode($statistc_last90Days); ?>;
-            lineChartData.datasets[0].label = '# <?php echo __("Total Views (90 Days)"); ?>';
-            myChart.update();
-            myChartPie.update();
-            myChartLine.update();
+        $.ajax({url: webSiteRootURL + 'view/report.json.php', data: {isAdminPanel: <?php echo User::isAdmin() ? 1 : 0; ?>}, dataType: 'json', timeout: 60000,
+            success: function (data) {
+                if (!data || data.error || ['today','last7Days','last15Days','last30Days','last90Days'].some(function (key) { return !data[key] || !Array.isArray(data[key].videos); })) { failed(); return; }
+                response = data;
+                <?php foreach ($reportMetrics as $metric) { ?>
+                $('#<?php echo $metric[0]; ?>').text(data.<?php echo $metric[1]; ?> == null ? '\u2014' : Number(data.<?php echo $metric[1]; ?>).toLocaleString());
+                <?php } ?>
+                draw();
+            }, error: failed, complete: function () { $('#refreshOverview').prop('disabled', false); AVideoReports.busy(false); }
         });
-        $('#btnToday').click(function () {
-            $('.nav-chart .btn').removeClass('active');
-            $(this).addClass('active');
-            chartData.datasets[0].data = <?php echo json_encode($datasToday); ?>;
-            chartData.datasets[0].label = '# <?php echo __("Today"); ?>';
-            lineChartData.labels = <?php echo json_encode($labelToday); ?>;
-            lineChartData.datasets[0].data = <?php echo json_encode($statistc_lastToday); ?>;
-            lineChartData.datasets[0].label = '# <?php echo __("Today"); ?>';
-            myChart.update();
-            myChartPie.update();
-            myChartLine.update();
-        });
-        $('#btn7').click(function () {
-            $('.nav-chart .btn').removeClass('active');
-            $(this).addClass('active');
-            chartData.datasets[0].data = <?php echo json_encode($datas7); ?>;
-            chartData.datasets[0].label = '# <?php echo __("Last 7 Days"); ?>';
-            lineChartData.labels = <?php echo json_encode($label7Days); ?>;
-            lineChartData.datasets[0].data = <?php echo json_encode($statistc_last7Days); ?>;
-            lineChartData.datasets[0].label = '# <?php echo __("Last 7 Days"); ?>';
-            myChart.update();
-            myChartPie.update();
-            myChartLine.update();
-        });
-        $('#btn30').click(function () {
-            $('.nav-chart .btn').removeClass('active');
-            $(this).addClass('active');
-            chartData.datasets[0].data = <?php echo json_encode($datas30); ?>;
-            chartData.datasets[0].label = '# <?php echo __("Last 30 Days"); ?>';
-            lineChartData.labels = <?php echo json_encode($label30Days); ?>;
-            lineChartData.datasets[0].data = <?php echo json_encode($statistc_last30Days); ?>;
-            lineChartData.datasets[0].label = '# <?php echo __("Last 30 Days"); ?>';
-            myChart.update();
-            myChartPie.update();
-            myChartLine.update();
-        });
-        $('#btnUnique').click(function () {
-            $('.nav-chart .btn').removeClass('active');
-            $(this).addClass('active');
-            chartData.datasets[0].data = <?php echo json_encode($datasUnique); ?>;
-            chartData.datasets[0].label = '# <?php echo __("Unique Users"); ?>';
-            myChart.update();
-            myChartPie.update();
-        });
-    });
+    }
+    $('#overviewPeriod').on('change', draw); $('#refreshOverview').on('click', load); load();
+});
 </script>

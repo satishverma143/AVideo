@@ -4,7 +4,7 @@ if (!isset($global['systemRootPath'])) {
     require_once '../../videos/configuration.php';
 }
 if (!User::isAdmin()) {
-    header("Location: {$global['webSiteRootURL']}?error=" . __("You can not do this"));
+    forbiddenPage("You can not do this");
     exit;
 }
 ?>
@@ -38,7 +38,7 @@ if (!User::isAdmin()) {
             <div class="panel panel-default ">
                 <div class="panel-heading"><?php echo __("Tag Types"); ?></div>
                 <div class="panel-body">
-                    <table id="campaignTable" class="display" width="100%" cellspacing="0">
+                    <table id="campaignTable" class="display table table-bordered table-responsive table-striped table-hover table-condensed" width="100%" cellspacing="0">
                         <thead>
                             <tr>
                                 <th><?php echo __("Name"); ?></th>
@@ -72,7 +72,7 @@ if (!User::isAdmin()) {
         </button>
     </div>
 </div>
-<script type="text/javascript" src="<?php echo $global['webSiteRootURL']; ?>view/css/DataTables/datatables.min.js"></script>
+<script type="text/javascript" src="<?php echo getURL('view/css/DataTables/datatables.min.js'); ?>"></script>
 
 <script type="text/javascript">
     $(document).ready(function () {
@@ -85,7 +85,7 @@ if (!User::isAdmin()) {
                 {
                     sortable: false,
                     data: null,
-                    defaultContent: $('#btnModelLinks').html(), "width": "60px"
+                    defaultContent: $('#btnModelLinks').html(), "width": "80px"
                 }
             ],
             select: true,
@@ -95,16 +95,17 @@ if (!User::isAdmin()) {
             e.preventDefault();
             var tr = $(this).closest('tr')[0];
             var data = tableLinks.row(tr).data();
-            swal({
+                    
+                    swal({
                 title: "<?php echo __("Are you sure?"); ?>",
-                text: "<?php echo __("You will not be able to recover this action!"); ?>",
-                type: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#DD6B55",
-                confirmButtonText: "<?php echo __("Yes, delete it!"); ?>",
-                closeOnConfirm: true
-            },
-                    function () {
+                text: "<?php echo __("You will not be able to recover this action!"); ?>", 
+                icon: "warning",
+                buttons: true,
+                dangerMode: true,
+            })
+            .then(function(willDelete) {
+              if (willDelete) {
+
                         modal.showPleaseWait();
                         $.ajax({
                             type: "POST",
@@ -113,12 +114,13 @@ if (!User::isAdmin()) {
 
                         }).done(function (resposta) {
                             if (resposta.error) {
-                                swal("<?php echo __("Sorry!"); ?>", resposta.msg, "error");
+                                avideoAlert("<?php echo __("Sorry!"); ?>", resposta.msg, "error");
                             }
                             tableLinks.ajax.reload();
                             modal.hidePleaseWait();
                         });
-                    });
+              } 
+            });
         });
 
         $('#campaignTable').on('click', 'button.editor_edit_link', function (e) {
@@ -138,14 +140,14 @@ if (!User::isAdmin()) {
             e.preventDefault();
             modal.showPleaseWait();
             $.ajax({
-                url: '<?php echo $global['webSiteRootURL']; ?>plugin/VideoTags/addTagTypes.php',
+                url: webSiteRootURL+'plugin/VideoTags/addTagTypes.php',
                 data: $('#panelForm').serialize(),
                 type: 'post',
                 success: function (response) {
                     if (response.error) {
-                        swal("<?php echo __("Sorry!"); ?>", response.msg, "error");
+                        avideoAlert("<?php echo __("Sorry!"); ?>", response.msg, "error");
                     } else {
-                        swal("<?php echo __("Congratulations!"); ?>", "<?php echo __("Your register has been saved!"); ?>", "success");
+                        avideoAlert("<?php echo __("Congratulations!"); ?>", "<?php echo __("Your register has been saved!"); ?>", "success");
 
                         $("#panelForm").trigger("reset");
                     }

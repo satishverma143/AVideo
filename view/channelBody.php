@@ -1,25 +1,95 @@
 <?php
-$isMyChannel = false;
-if (User::isLogged() && $user_id == User::getId()) {
-    $isMyChannel = true;
+/**
+ * Channel main page
+ * Refactored: 2025‑07‑30
+ *
+ * – Simplified tab‑selection logic (single $activeTab source of truth)
+ * – Replaced getChannelTabClass() with clearer helpers
+ * – Preserved all original features and outputs
+ */
+
+global $global;
+require_once $global['systemRootPath'] . 'objects/functionInfiniteScroll.php';
+
+// -----------------------------------------------------------------------------
+// BASIC SETUP
+// -----------------------------------------------------------------------------
+$isMyChannel = (User::isLogged() && $user_id == User::getId());
+$user        = new User($user_id);
+
+// Redirect if URL mismatch
+if ($user->getBdId() != $user_id) {
+    header("Location: {$global['webSiteRootURL']}channels");
+    exit;
 }
-$user = new User($user_id);
-$_GET['channelName'] = $user->getChannelName();
+
+$global['isChannel']   = $user_id;
+$_GET['channelName']   = $user->getChannelName();
+
 $timeLog = __FILE__ . " - channelName: {$_GET['channelName']}";
 TimeLogStart($timeLog);
+
+// -----------------------------------------------------------------------------
+// GALLERY/PAGINATION CONFIG
+// -----------------------------------------------------------------------------
 $_POST['sort']['created'] = "DESC";
+$rowCount                 = 25;
+$_REQUEST['rowCount']     = $rowCount;
 
-if (empty($_GET['current'])) {
-    $_POST['current'] = 1;
+// IMPORTANT: keep original visibility logic
+if (empty($channelPassword) && !$isMyChannel) {
+    $status       = 'a';
+    $showUnlisted = false;
 } else {
-    $_POST['current'] = $_GET['current'];
+    $status       = Video::SORT_TYPE_VIEWABLE;
+    $showUnlisted = true;
 }
-$current = $_POST['current'];
-$rowCount = 25;
-$_POST['rowCount'] = $rowCount;
 
-$uploadedVideos = Video::getAllVideos("a", $user_id, !isToHidePrivateVideos());
-$uploadedTotalVideos = Video::getTotalVideos("a", $user_id, !isToHidePrivateVideos());
+// Owner permissions
+$ownerCanUplaodVideos = $user->getCanUpload() || $user->getIsAdmin() || AVideoPlugin::userCanUpload($user_id);
+
+// -----------------------------------------------------------------------------
+// TAB DATA GATHERING (preserve original behavior)
+// -----------------------------------------------------------------------------
+$uploadedVideos = $uploadedArticles = $uploadedAudio = $uploadedImages = [];
+$uploadedTotalVideos = $uploadedTotalArticles = $uploadedTotalAudio = $uploadedTotalImages = 0;
+
+$type = ''; // used to exclude article/audio/image when fetching "Videos"
+
+if ($ownerCanUplaodVideos && $advancedCustomUser->showArticlesTab && AVideoPlugin::isEnabledByName('Articles')) {
+    $uploadedTotalArticles = Video::getTotalVideos($status, $user_id, !isToHidePrivateVideos(), $showUnlisted, true, false, Video::$videoTypeArticle);
+    if (!empty($uploadedTotalArticles)) {
+        $uploadedArticles = Video::getAllVideos($status, $user_id, !isToHidePrivateVideos(), [], false, $showUnlisted, true, false, null, Video::$videoTypeArticle);
+    }
+    $type = 'notArticle';
+}
+
+if ($ownerCanUplaodVideos && $advancedCustomUser->showAudioTab) {
+    $uploadedTotalAudio = Video::getTotalVideos($status, $user_id, !isToHidePrivateVideos(), $showUnlisted, true, false, Video::$videoTypeAudio);
+    if (!empty($uploadedTotalAudio)) {
+        $uploadedAudio = Video::getAllVideos($status, $user_id, !isToHidePrivateVideos(), [], false, $showUnlisted, true, false, null, Video::$videoTypeAudio);
+    }
+    if (empty($type)) {
+        $type = 'notAudio';
+    } else {
+        $type = 'notArticleOrAudio';
+    }
+}
+
+if ($ownerCanUplaodVideos && $advancedCustomUser->showImageTab) {
+    $uploadedTotalImages = Video::getTotalVideos($status, $user_id, !isToHidePrivateVideos(), $showUnlisted, true, false, Video::$videoTypeImage);
+    if (!empty($uploadedTotalImages)) {
+        $uploadedImages = Video::getAllVideos($status, $user_id, !isToHidePrivateVideos(), [], false, $showUnlisted, true, false, null, Video::$videoTypeImage);
+    }
+}
+
+if ($ownerCanUplaodVideos) {
+    $uploadedTotalVideos = Video::getTotalVideos($status, $user_id, !isToHidePrivateVideos(), $showUnlisted, true, false, $type);
+    if (!empty($uploadedTotalVideos)) {
+        $uploadedVideos = Video::getAllVideos($status, $user_id, !isToHidePrivateVideos(), [], false, $showUnlisted, true, false, null, $type);
+    }
+}
+
 TimeLogEnd($timeLog, __LINE__);
 $totalPages = ceil($uploadedTotalVideos / $rowCount);
 
@@ -27,105 +97,478 @@ unset($_POST['sort']);
 unset($_POST['rowCount']);
 unset($_POST['current']);
 
-$get = array('channelName' => $_GET['channelName']);
-$palyListsObj = AVideoPlugin::getObjectDataIfEnabled('PlayLists');
+$get           = ['channelName' => $_GET['channelName']];
+$palyListsObj  = AVideoPlugin::getObjectDataIfEnabled('PlayLists');
 TimeLogEnd($timeLog, __LINE__);
-?>
-<!-- <?php var_dump($uploadedTotalVideos, $user_id, !isToHidePrivateVideos()); ?> -->
-<div class="bgWhite list-group-item gallery clear clearfix" >
-    <div class="row">
-        <div class="col-lg-12 col-sm-12 col-xs-12">
-            <center style="margin:5px;">
-                <?php
-                echo getAdsChannelLeaderBoardTop();
-                ?>
-            </center>
-        </div>
-    </div>
-    <?php
-    if (empty($advancedCustomUser->doNotShowTopBannerOnChannel)) {
-        ?>
-        <div class="row bg-info profileBg" style="background-image: url('<?php echo $global['webSiteRootURL'], $user->getBackgroundURL(), "?", @filectime($global['systemRootPath'] . $user->getBackgroundURL()); ?>')">
-            <img src="<?php echo User::getPhoto($user_id); ?>" alt="<?php echo $user->_getName(); ?>" class="img img-responsive img-thumbnail" style="max-width: 100px;"/>
-        </div>    
-        <?php
-    }
-    ?>
-    <div class="row"><div class="col-6 col-md-12">
-            <h1 class="pull-left">
-                <?php
-                echo $user->getNameIdentificationBd();
-                ?>
-                <?php
-                echo User::getEmailVerifiedIcon($user_id)
-                ?></h1>
-            <span class="pull-right">
-                <?php
-                echo Subscribe::getButton($user_id);
-                ?>
-            </span>
-        </div></div>
-    <div class="col-md-12">
-        <?php echo nl2br($user->getAbout()); ?>
-    </div>
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <?php
-            if ($isMyChannel) {
-                ?>
-                <a href="<?php echo $global['webSiteRootURL']; ?>mvideos" class="btn btn-success ">
-                    <span class="glyphicon glyphicon-film"></span>
-                    <span class="glyphicon glyphicon-headphones"></span>
-                    <?php echo __("My videos"); ?>
-                </a>
-                <?php
-            } else {
-                echo __("My videos");
-            }
-            echo AVideoPlugin::getChannelButton();
-            ?>
-        </div>
-        <div class="panel-body">
-            <?php
-            if (!empty($uploadedVideos[0])) {
-                $video = $uploadedVideos[0];
-                $obj = new stdClass();
-                $obj->BigVideo = true;
-                $obj->Description = false;
-                include $global['systemRootPath'] . 'plugin/Gallery/view/BigVideo.php';
-                unset($uploadedVideos[0]);
-            }
-            ?>
-            <div class="row mainArea">
-                <?php
-                TimeLogEnd($timeLog, __LINE__);
-                createGallerySection($uploadedVideos, "", $get);
-                TimeLogEnd($timeLog, __LINE__);
-                ?>
-            </div>
-        </div>
+$obj           = AVideoPlugin::getObjectData("YouPHPFlix2");
 
-        <div class="panel-footer">
-            <ul id="channelPagging"></ul>
+if ($advancedCustomUser->showChannelLiveTab) {
+    $liveVideos = getLiveVideosFromUsers_id($user_id);
+}
+
+// Determine which tabs exist
+$showChannelHomeTab     = $advancedCustomUser->showChannelHomeTab   && $ownerCanUplaodVideos && !empty($uploadedVideos);
+$showChannelVideosTab   = $advancedCustomUser->showChannelVideosTab && $ownerCanUplaodVideos && !empty($uploadedVideos);
+$showChannelProgramsTab = $advancedCustomUser->showChannelProgramsTab && !empty($palyListsObj);
+$totalPrograms = $showChannelProgramsTab ? PlayList::getTotalFromUser($user_id, !$isMyChannel, false, 0, 0, true) : 0;
+
+$channelShowBranding = empty($advancedCustomUser->doNotShowTopBannerOnChannel);
+$channelBackgroundType = isMobile() ? User::$channel_artDesktopMin : User::$channel_artDesktopMax;
+$channelBackgroundURL = $user->getBackgroundURL($channelBackgroundType);
+$channelHasCover = $channelShowBranding && is_file($global['systemRootPath'] . $channelBackgroundURL);
+$channelMobileBackgroundURL = $user->getBackgroundURL(User::$channel_artDesktopMin);
+
+// -----------------------------------------------------------------------------
+// TAB LOGIC – single source of truth
+// -----------------------------------------------------------------------------
+require_once $global['systemRootPath'] . 'objects/functions.php'; // provides getCurrentPage(), resetCurrentPage(), etc.
+
+// Decide default tab if none provided
+$availableTabs = array_filter([
+    'channelHome' => $showChannelHomeTab,
+    'channelVideos' => $showChannelVideosTab,
+    'channelArticles' => !empty($uploadedTotalArticles),
+    'channelAudio' => !empty($uploadedTotalAudio),
+    'channelImages' => !empty($uploadedTotalImages),
+    'channelPlayLists' => $showChannelProgramsTab && !empty($totalPrograms),
+]);
+$defaultTab = key($availableTabs) ?: '';
+
+// Keep compatibility with "Videos gets active when page > 1"
+$activeTab = $_GET['tab'] ?? ((getCurrentPage() != 1 && $showChannelVideosTab) ? 'channelVideos' : $defaultTab);
+if (!is_string($activeTab) || !isset($availableTabs[$activeTab])) {
+    $activeTab = $defaultTab;
+}
+
+// Helpers to produce CSS classes
+function tabButtonClass(string $tab): string
+{
+    global $activeTab;
+    return $activeTab === $tab ? ' active ' : '';
+}
+function tabContentClass(string $tab): string
+{
+    global $activeTab;
+    return $activeTab === $tab ? ' active fade in ' : ' fade ';
+}
+
+?>
+<link href="<?php echo getURL('view/css/social.css'); ?>" rel="stylesheet" type="text/css" />
+<div class="clearfix"></div>
+<div class="panel panel-default channel-layout<?php echo $channelHasCover ? ' channel-has-cover' : ''; ?>">
+    <div class="panel-body">
+        <div class="gallery galleryLayout">
+            <div class="row clearfix">
+                <div class="col-lg-12 col-sm-12 col-xs-12">
+                    <center style="margin:5px;">
+                        <?php
+                        $getAdsChannelLeaderBoardTop = getAdsChannelLeaderBoardTop();
+                        if (!empty($getAdsChannelLeaderBoardTop)) {
+                            echo $getAdsChannelLeaderBoardTop;
+                        } else {
+                            echo "<!-- ";
+                            echo "getAdsChannelLeaderBoardTop is empty ";
+                            echo implode(', ', ADs::getAdsCodeReason('channelLeaderBoardTop'));
+                            echo " -->";
+                        }
+                        ?>
+                    </center>
+                </div>
+            </div>
+
+            <?php if ($channelHasCover) { ?>
+                <a class="channel-cover" href="<?php echo User::getWebsite($user_id); ?>" target="_blank">
+                    <picture>
+                        <?php if (is_file($global['systemRootPath'] . $channelMobileBackgroundURL)) { ?>
+                            <source media="(max-width: 767px)" srcset="<?php echo getURL($channelMobileBackgroundURL); ?>" />
+                        <?php } ?>
+                        <img src="<?php echo getURL($channelBackgroundURL); ?>" alt="" />
+                    </picture>
+                </a>
+            <?php } ?>
+
+            <div class="row channel-heading">
+                <?php if ($channelShowBranding) { ?>
+                    <div class="channel-avatar">
+                        <img src="<?php echo User::getPhoto($user_id); ?>" alt="<?php echo htmlspecialchars($user->getNameIdentificationBd(), ENT_QUOTES, 'UTF-8'); ?>" class="img-responsive img-thumbnail" />
+                    </div>
+                <?php } ?>
+                <div class="channel-identity">
+                    <h1>
+                        <?php echo $user->getNameIdentificationBd(); ?>
+                        <?php echo User::getEmailVerifiedIcon($user_id); ?>
+                    </h1>
+                    <ul class="social-network social-circle">
+                        <?php
+                        $socialMedia = CustomizeUser::getSocialMedia();
+                        foreach ($socialMedia as $platform => $details) {
+                            if ($details['isActive']) {
+                                $url = User::getSocialMediaURL($platform, $user_id);
+                                if (!empty($url)) {
+                        ?>
+                                    <li>
+                                        <a href="<?php echo $url; ?>" target="_blank" class="<?php echo $details['class']; ?>" title="<?php echo $details['label']; ?>" data-toggle="tooltip">
+                                            <i class="<?php echo $details['icon']; ?>"></i>
+                                        </a>
+                                    </li>
+                        <?php
+                                }
+                            }
+                        }
+                        ?>
+                    </ul>
+                </div>
+                <div class="channel-actions">
+                    <?php echo AVideoPlugin::getChannelPageButtons($user_id); ?>
+                </div>
+            </div>
+
+            <?php
+            $about = html_entity_decode($user->getAbout(), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (!empty($about)) {
+                // Decode legacy stored content, then purify it before rendering.
+                require_once $global['systemRootPath'] . 'objects/channelAboutHTML.php';
+                $about = purifyChannelAboutHTML($about, $global['webSiteRootURL'], getCacheDir());
+            }
+            if (trim($about) !== '') {
+            ?>
+            <div id="aboutArea" class="channel-about">
+                <?php
+                if (!empty($advancedCustomUser->showAllAboutTextOnChannel)) {
+                    echo $about;
+                } else {
+                ?>
+                    <div id="aboutAreaPreContent">
+                        <div id="aboutAreaContent">
+                            <?php echo $about; ?>
+                        </div>
+                    </div>
+                    <button onclick="$('#aboutArea').toggleClass('expanded');" class="btn btn-xs btn-default" id="aboutAreaShowMoreBtn">
+                        <span class="showMore"><i class="fas fa-caret-down"></i> <?php echo __("Show More"); ?></span>
+                        <span class="showLess"><i class="fas fa-caret-up"></i> <?php echo __("Show Less"); ?></span>
+                    </button>
+                <?php } ?>
+            </div>
+            <?php } ?>
+
             <script>
-                $(document).ready(function () {
-                    $('#channelPagging').bootpag({
-                        total: <?php echo $totalPages; ?>,
-                        page: <?php echo $current; ?>,
-                        maxVisible: 10
-                    }).on('page', function (event, num) {
-                        document.location = ("<?php echo $global['webSiteRootURL']; ?>channel/<?php echo $_GET['channelName']; ?>?current=" + num);
-                    });
+                $(document).ready(function() {
+                    if ($('#aboutAreaContent').outerHeight() > $('#aboutAreaPreContent').height()) {
+                        $('#aboutAreaShowMoreBtn').show();
+                    }
                 });
             </script>
-        </div>
-    </div>
-    <?php
-    if (!empty($palyListsObj)) {
-        TimeLogEnd($timeLog, __LINE__);
-        include $global['systemRootPath'] . 'view/channelPlaylist.php';
-        TimeLogEnd($timeLog, __LINE__);
-    }
-    ?>
-</div>
-<script src="<?php echo $global['webSiteRootURL']; ?>plugin/Gallery/script.js" type="text/javascript"></script>
+
+            <?php if (!User::hasBLockedUser($user_id)) { ?>
+                <div id="channelLive">
+                    <?php if (!empty($liveVideos)) { createGallerySection($liveVideos, false); } ?>
+                </div>
+
+                <div class="tabbable-panel">
+                    <div class="tabbable-line">
+                        <?php if (!empty($availableTabs)) { ?>
+                        <ul class="nav nav-tabs">
+                            <?php if ($showChannelHomeTab) { ?>
+                                <li class="nav-item <?php echo tabButtonClass('channelHome'); ?>">
+                                    <a class="nav-link" href="#channelHome" data-toggle="tab" aria-expanded="false">
+                                        <i class="fas fa-home"></i> <span class="labelUpperCase"><?php echo __('Home'); ?></span>
+                                    </a>
+                                </li>
+                            <?php } ?>
+
+                            <?php if ($showChannelVideosTab) { echo PHP_EOL . '<!-- showChannelVideosTab -->' . PHP_EOL; ?>
+                                <li class="nav-item <?php echo tabButtonClass('channelVideos'); ?>">
+                                    <a class="nav-link" href="#channelVideos" data-toggle="tab" aria-expanded="false">
+                                        <i class="fas fa-file-video"></i> <span class="labelUpperCase"><?php echo __('Videos'); ?></span> <span class="badge"><?php echo $uploadedTotalVideos; ?></span>
+                                    </a>
+                                </li>
+                            <?php } else {
+                                if (!$advancedCustomUser->showChannelVideosTab) echo PHP_EOL . '<!-- NOT showChannelVideosTab -->' . PHP_EOL;
+                                if (!$ownerCanUplaodVideos) echo PHP_EOL . '<!-- NOT ownerCanUplaodVideos -->' . PHP_EOL;
+                                if (empty($uploadedVideos)) echo PHP_EOL . '<!-- empty uploadedVideos -->' . PHP_EOL;
+                            } ?>
+
+                            <?php if (!empty($uploadedTotalArticles)) { ?>
+                                <li class="nav-item <?php echo tabButtonClass('channelArticles'); ?>">
+                                    <a class="nav-link" href="#channelArticles" data-toggle="tab" aria-expanded="false">
+                                        <i class="far fa-file-alt"></i> <span class="labelUpperCase"><?php echo __('Articles'); ?></span> <span class="badge"><?php echo $uploadedTotalArticles; ?></span>
+                                    </a>
+                                </li>
+                            <?php } ?>
+
+                            <?php if (!empty($uploadedTotalAudio)) { ?>
+                                <li class="nav-item <?php echo tabButtonClass('channelAudio'); ?>">
+                                    <a class="nav-link" href="#channelAudio" data-toggle="tab" aria-expanded="false">
+                                        <i class="fas fa-file-audio"></i> <span class="labelUpperCase"><?php echo __('Audio'); ?></span> <span class="badge"><?php echo $uploadedTotalAudio; ?></span>
+                                    </a>
+                                </li>
+                            <?php } ?>
+
+                            <?php if (!empty($uploadedTotalImages)) { ?>
+                                <li class="nav-item <?php echo tabButtonClass('channelImages'); ?>">
+                                    <a class="nav-link" href="#channelImages" data-toggle="tab" aria-expanded="false">
+                                        <i class="fa-solid fa-images"></i>
+                                        <span class="labelUpperCase"><?php echo __("Images"); ?></span>
+                                        <span class="badge"><?php echo $uploadedTotalImages; ?></span>
+                                    </a>
+                                </li>
+                            <?php } ?>
+
+                            <?php
+                            if ($showChannelProgramsTab) {
+                                if ($totalPrograms) {
+                            ?>
+                                <li class="nav-item <?php echo tabButtonClass('channelPlayLists'); ?>" id="channelPlayListsLi">
+                                    <a class="nav-link" href="#channelPlayLists" data-toggle="tab" aria-expanded="true">
+                                        <i class="fas fa-list"></i> <span class="labelUpperCase"><?php echo __($palyListsObj->name); ?></span> <span class="badge"><?php echo $totalPrograms; ?></span>
+                                    </a>
+                                </li>
+                            <?php } } ?>
+                        </ul>
+                        <?php } ?>
+
+                        <div class="tab-content clearfix">
+                            <?php if ($showChannelHomeTab) { ?>
+                                <style>#bigVideo { top: 0 !important; }</style>
+                                <div class="tab-pane <?php echo tabContentClass('channelHome'); ?>" id="channelHome">
+                                    <?php
+                                    // Keep original YouPHPFlix2 setup
+                                    $obj = AVideoPlugin::getObjectData("YouPHPFlix2");
+                                    // this plugin's own copy of the flag may be stale if the operator manages it via a different gallery plugin
+                                    $obj->hidePrivateVideos = isToHidePrivateVideos();
+                                    $obj->BigVideo                 = true;
+                                    $obj->PlayList                 = false;
+                                    $obj->Channels                 = false;
+                                    $obj->Trending                 = false;
+                                    $obj->pageDots                 = false;
+                                    $obj->TrendingAutoPlay         = false;
+                                    $obj->maxVideos                = 12;
+                                    $obj->Suggested                = false;
+                                    $obj->paidOnlyLabelOverPoster  = false;
+                                    $obj->DateAdded                = true;
+                                    $obj->DateAddedAutoPlay        = true;
+                                    $obj->MostPopular              = false;
+                                    $obj->MostWatched              = false;
+                                    $obj->SortByName               = false;
+                                    $obj->Categories               = false;
+                                    $obj->playVideoOnFullscreen    = false;
+                                    $obj->titleLabel               = true;
+                                    $obj->RemoveBigVideoDescription= true;
+
+                                    include $global['systemRootPath'] . 'plugin/YouPHPFlix2/view/modeFlixBody.php';
+                                    ?>
+                                </div>
+                            <?php } ?>
+
+                            <?php if ($showChannelVideosTab) { ?>
+                                <div class="tab-pane <?php echo tabContentClass('channelVideos'); ?>" id="channelVideos">
+                                    <div class="panel panel-default">
+                                        <div class="panel-heading">
+                                            <?php if ($isMyChannel) { ?>
+                                                <a href="<?php echo $global['webSiteRootURL']; ?>mvideos" class="btn btn-success ">
+                                                    <i class="fa-solid fa-film"></i>
+                                                    <i class="fa-solid fa-headphones"></i>
+                                                    <?php echo __("My videos"); ?>
+                                                </a>
+                                            <?php } else {
+                                                echo __("Videos");
+                                            }
+                                            echo AVideoPlugin::getChannelButton();
+                                            ?>
+                                        </div>
+                                        <div class="panel-body">
+                                            <?php
+                                            $video = false;
+                                            if ($advancedCustomUser->showBigVideoOnChannelVideosTab && !empty($uploadedVideos[0])) {
+                                                $video = $uploadedVideos[0];
+                                                $obj = new stdClass();
+                                                $obj->BigVideo = true;
+                                                $obj->Description = false;
+                                                include $global['systemRootPath'] . 'plugin/Gallery/view/BigVideo.php';
+                                                if (empty($suggestedOrPinnedFound)) {
+                                                    unset($uploadedVideos[0]);
+                                                }
+                                            }
+                                            ?>
+                                            <div class="row">
+                                                <?php
+                                                TimeLogEnd($timeLog, __LINE__);
+                                                createGallerySection($uploadedVideos, false);
+                                                TimeLogEnd($timeLog, __LINE__);
+                                                ?>
+                                            </div>
+                                        </div>
+                                        <div class="panel-footer">
+                                            <?php
+                                            echo getPagination(
+                                                $totalPages,
+                                                "{$global['webSiteRootURL']}channel/{$_GET['channelName']}?current=_pageNum_&tab=channelVideos",
+                                                $rowCount,
+                                                '',
+                                                '#channelVideos',
+                                                true,
+                                                'channelVideos'
+                                            );
+                                            ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
+
+                            <?php if (!empty($uploadedTotalArticles)) { ?>
+                                <div class="tab-pane <?php echo tabContentClass('channelArticles'); ?>" id="channelArticles">
+                                    <div class="panel panel-default">
+                                        <div class="panel-heading">
+                                            <?php if ($isMyChannel) { ?>
+                                                <a href="<?php echo $global['webSiteRootURL']; ?>mvideos" class="btn btn-success ">
+                                                    <i class="far fa-newspaper"></i>
+                                                    <?php echo __("Articles"); ?>
+                                                </a>
+                                            <?php } else {
+                                                echo __("Articles");
+                                            }
+                                            echo AVideoPlugin::getChannelButton();
+                                            ?>
+                                        </div>
+                                        <div class="panel-body">
+                                            <div class="row">
+                                                <?php
+                                                TimeLogEnd($timeLog, __LINE__);
+                                                createGallerySection($uploadedArticles, false);
+                                                TimeLogEnd($timeLog, __LINE__);
+                                                ?>
+                                            </div>
+                                        </div>
+                                        <div class="panel-footer">
+                                            <?php
+                                            $totalPagesArticles = ceil($uploadedTotalArticles / $rowCount);
+                                            echo getPagination($totalPagesArticles, "{$global['webSiteRootURL']}channel/{$_GET['channelName']}?current=_pageNum_&tab=channelArticles");
+                                            ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
+
+                            <?php if (!empty($uploadedTotalAudio)) { ?>
+                                <div class="tab-pane <?php echo tabContentClass('channelAudio'); ?>" id="channelAudio">
+                                    <div class="panel panel-default">
+                                        <div class="panel-heading">
+                                            <?php if ($isMyChannel) { ?>
+                                                <a href="<?php echo $global['webSiteRootURL']; ?>mvideos" class="btn btn-success ">
+                                                    <i class="fa-solid fa-headphones"></i>
+                                                    <?php echo __("Audio"); ?>
+                                                </a>
+                                            <?php } else {
+                                                echo __("Audio");
+                                            }
+                                            echo AVideoPlugin::getChannelButton();
+                                            ?>
+                                        </div>
+                                        <div class="panel-body">
+                                            <div class="row">
+                                                <?php
+                                                TimeLogEnd($timeLog, __LINE__);
+                                                createGallerySection($uploadedAudio, false);
+                                                TimeLogEnd($timeLog, __LINE__);
+                                                ?>
+                                            </div>
+                                        </div>
+                                        <div class="panel-footer">
+                                            <?php
+                                            $totalPagesAudio = ceil($uploadedTotalAudio / $rowCount);
+                                            echo getPagination($totalPagesAudio, "{$global['webSiteRootURL']}channel/{$_GET['channelName']}?current=_pageNum_&tab=channelAudio");
+                                            ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
+
+                            <?php if (!empty($uploadedTotalImages)) { ?>
+                                <div class="tab-pane <?php echo tabContentClass('channelImages'); ?>" id="channelImages">
+                                    <div class="panel panel-default">
+                                        <div class="panel-heading">
+                                            <?php if ($isMyChannel) { ?>
+                                                <a href="<?php echo $global['webSiteRootURL']; ?>mvideos" class="btn btn-success ">
+                                                    <i class="fa-solid fa-images"></i>
+                                                    <?php echo __("Images"); ?>
+                                                </a>
+                                            <?php } else {
+                                                echo __("Images");
+                                            }
+                                            echo AVideoPlugin::getChannelButton();
+                                            ?>
+                                        </div>
+                                        <div class="panel-body">
+                                            <div class="row">
+                                                <?php
+                                                TimeLogEnd($timeLog, __LINE__);
+                                                createGallerySection($uploadedImages, false);
+                                                TimeLogEnd($timeLog, __LINE__);
+                                                ?>
+                                            </div>
+                                        </div>
+                                        <div class="panel-footer">
+                                            <?php
+                                            $totalPagesImages = ceil($uploadedTotalImages / $rowCount);
+                                            echo getPagination($totalPagesImages, "{$global['webSiteRootURL']}channel/{$_GET['channelName']}?current=_pageNum_&tab=channelImages");
+                                            ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php } ?>
+
+                            <?php if ($showChannelProgramsTab) { ?>
+                                <div class="tab-pane <?php echo tabContentClass('channelPlayLists'); ?>" id="channelPlayLists" style="min-height: 800px;">
+                                    <div class="panel panel-default">
+                                        <div class="panel-heading text-right">
+                                            <?php if ($isMyChannel) { ?>
+                                                <a class="btn btn-default btn-xs " href="<?php echo $global['webSiteRootURL']; ?>plugin/PlayLists/managerPlaylists.php">
+                                                    <i class="fas fa-edit"></i> <?php echo __('Organize') . ' ' . __($palyListsObj->name); ?>
+                                                </a>
+                                            <?php } ?>
+                                        </div>
+                                        <div class="panel-body">
+                                            <?php
+                                            if (!empty($totalPrograms)) {
+                                                include $global['systemRootPath'] . 'view/channelPlaylist.php';
+                                            } else {
+                                                if ($isMyChannel) {
+                                                    ?>
+                                                    <div class="alert alert-warning" role="alert" style="margin-top: 20px;">
+                                                        <h4 class="alert-heading text-center"><?php echo __('No Playlist Found'); ?></h4>
+                                                        <p class="text-center">
+                                                            <?php echo __('You haven\'t created any') . ' ' . __($palyListsObj->name); ?>
+                                                        </p>
+                                                        <hr>
+                                                        <p class="mb-0 text-center">
+                                                            <?php echo __('Once you\'ve created a playlist, it will appear here.'); ?>
+                                                        </p>
+                                                    </div>
+                                                    <?php
+                                                } else {
+                                                    ?>
+                                                    <div class="alert alert-warning" role="alert" style="margin-top: 20px;">
+                                                        <h4 class="alert-heading text-center"><?php echo __('No Playlist Found'); ?></h4>
+                                                        <p class="text-center">
+                                                            <?php echo __('This user does not have any') . ' ' . __($palyListsObj->name); ?>
+                                                        </p>
+                                                    </div>
+                                                    <?php
+                                                }
+                                            }
+                                            ?>
+                                        </div>
+                                        <div class="panel-footer"></div>
+                                    </div>
+                                </div>
+                            <?php } ?>
+                        </div><!-- /.tab-content -->
+                    </div><!-- /.tabbable-line -->
+                </div><!-- /.tabbable-panel -->
+            <?php } /* end if !User::hasBLockedUser */ ?>
+        </div><!-- /.gallery -->
+    </div><!-- /.panel-body -->
+</div><!-- /.panel -->
+
+<script src="<?php echo getURL('plugin/Gallery/script.js'); ?>" type="text/javascript"></script>
+<script src="<?php echo getURL('node_modules/infinite-scroll/dist/infinite-scroll.pkgd.min.js'); ?>" type="text/javascript"></script>

@@ -15,8 +15,10 @@ if(empty($plugin)){
 
 header('Content-Type: application/json');
 
-$users = $plugin->getAllUsers();
+$_POST['current'] = getCurrentPage();
+$_POST['rowCount'] = getRowCount();
+// Admins receive full rows; non-admins get display-only fields (see YPTWallet::getAllUsersPublicFields).
+$users = User::isAdmin() ? $plugin->getAllUsers() : $plugin->getAllUsersPublicFields();
 
 $total = User::getTotalUsers(true);
-
 echo '{  "current": '.$_POST['current'].',"rowCount": '.$_POST['rowCount'].', "total": '.$total.', "rows":'. json_encode($users).'}';

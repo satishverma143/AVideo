@@ -1,8 +1,15 @@
 <?php
+
 global $global;
 require_once $global['systemRootPath'] . 'plugin/Plugin.abstract.php';
 
 class MaintenanceMode extends PluginAbstract {
+
+    public function getTags() {
+        return array(
+            PluginTags::$FREE,
+        );
+    }
 
     public function getDescription() {
         global $global;
@@ -22,22 +29,60 @@ class MaintenanceMode extends PluginAbstract {
     }
 
     public function getPluginVersion() {
-	return "1.0";
+        return "2.0";
     }
 
     public function getStart() {
         global $global, $config;
-        $forbidden = array(
-            $global['systemRootPath'].'view/index.php',
-            $global['systemRootPath'].'view/channels.php',
-            $global['systemRootPath'].'view/channel.php'
-        );
-        if(empty($global['disableAdvancedConfigurations']) && !User::isAdmin() 
-                && in_array($_SERVER["SCRIPT_FILENAME"] ,$forbidden)){
+        if ($this->shouldEnterInMaintenencaMode()) {
+            header('HTTP/1.0 403 Forbidden');
             $obj = $this->getDataObject();
-            include $global['systemRootPath'] . 'plugin/MaintenanceMode/index.php';
+            if (isContentTypeJson()) {
+                header("Content-Type: application/json");
+                $resp = new stdClass();
+                $resp->error = true;
+                $resp->msg = $obj->text;
+                $resp->MaintenanceMode = true;
+                echo (json_encode($resp));
+            } else if (isContentTypeXML()) {
+                header("Content-Type: application/xml");
+                echo '<?xml version="1.0" encoding="UTF-8"?>
+<response>
+    <error>true</error>
+    <msg>' . $obj->text . '</msg>
+    <MaintenanceMode>true</MaintenanceMode>
+</response>
+';
+            } else {
+                include $global['systemRootPath'] . 'plugin/MaintenanceMode/index.php';
+            }
             exit;
         }
+    }
+
+    public function shouldEnterInMaintenencaMode() {
+        global $global, $config;
+        $obj = $this->getDataObject();
+        if (!empty($obj->stopFeed)) {
+            if (preg_match('/feed/i', $_SERVER["SCRIPT_FILENAME"])) {
+                return true;
+            }
+        }
+        if (!empty($obj->stopVideo) && !empty(getVideos_id()) && !User::isAdmin()) {
+            return true;
+        }
+        $forbidden = array(
+            $global['systemRootPath'] . 'view' . DIRECTORY_SEPARATOR . 'index.php',
+            $global['systemRootPath'] . 'view' . DIRECTORY_SEPARATOR . 'channels.php',
+            $global['systemRootPath'] . 'view' . DIRECTORY_SEPARATOR . 'channel.php',
+            $global['systemRootPath'] . 'view' . DIRECTORY_SEPARATOR . 'trending.php'
+        );
+        $SCRIPT_FILENAME = str_replace('/', DIRECTORY_SEPARATOR, $_SERVER["SCRIPT_FILENAME"]);
+        //var_dump($SCRIPT_FILENAME, $forbidden);exit;
+        if (empty($global['disableAdvancedConfigurations']) && !User::isAdmin() && in_array($SCRIPT_FILENAME, $forbidden)) {
+            return true;
+        }
+        return false;
     }
 
     public function getEmptyDataObject() {
@@ -47,17 +92,22 @@ class MaintenanceMode extends PluginAbstract {
         $obj->facebookLink = '';
         $obj->twitterLink = '';
         $obj->googleLink = '';
-	$obj->discordLink = '';
+        $obj->discordLink = '';
+        $obj->stopFeed = true;
+        $obj->stopVideo = true;
         $obj->endIn = date("Y-m-d H:i:s", strtotime("+1 week"));
         $obj->hideClock = false;
-        $obj->backgroundImageURL = $global['webSiteRootURL']."plugin/MaintenanceMode/images/bg01.jpg";
+        $obj->backgroundImageURL = $global['webSiteRootURL'] . "plugin/MaintenanceMode/images/bg01.jpg";
+        $obj->redirectHere = '';
         return $obj;
     }
 
     public function getFooterCode() {
         global $global, $config;
-        $obj = $this->getDataObject();
-        include $global['systemRootPath'] . 'plugin/MaintenanceMode/footer.php';
+        if (!isEmbed()) {
+            $obj = $this->getDataObject();
+            include $global['systemRootPath'] . 'plugin/MaintenanceMode/footer.php';
+        }
     }
 
 }

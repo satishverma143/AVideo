@@ -1,318 +1,257 @@
-<div class="form-group">
-    <label class="col-md-4 control-label"><?php echo __("Name"); ?></label>
-    <div class="col-md-8 inputGroupContainer">
-        <div class="input-group">
-            <span class="input-group-addon"><i class="glyphicon glyphicon-pencil"></i></span>
-            <input  id="inputName" placeholder="<?php echo __("Name"); ?>" class="form-control"  type="text" value="<?php echo $user->getName(); ?>" required >
-        </div>
-    </div>
-</div>
-
-<div class="form-group">
-    <label class="col-md-4 control-label"><?php echo __("User"); ?></label>
-    <div class="col-md-8 inputGroupContainer">
-        <div class="input-group">
-            <span class="input-group-addon"><i class="glyphicon glyphicon-user"></i></span>
-            <input  id="inputUser" placeholder="<?php echo !empty($advancedCustomUser->forceLoginToBeTheEmail) ? "me@example.com" : __("User"); ?>" class="form-control"  type="<?php echo empty($advancedCustomUser->forceLoginToBeTheEmail)?"text":"email"?>" value="<?php echo $user->getUser(); ?>" required <?php echo (AVideoPlugin::isEnabledByName("LoginLDAP") || empty($advancedCustomUser->userCanChangeUsername))?"readonly":""; ?>  >
-        </div>
-    </div>
-</div>
-
-<div class="form-group">
-    <label class="col-md-4 control-label"><?php echo __("E-mail"); ?></label>
-    <div class="col-md-6 inputGroupContainer">
-        <div class="input-group">
-            <span class="input-group-addon"><i class="glyphicon glyphicon-envelope"></i></span>
-            <input  id="inputEmail" placeholder="<?php echo __("E-mail"); ?>" class="form-control"  type="email" value="<?php echo $user->getEmail(); ?>" required
-                    <?php if (!empty($advancedCustomUser->forceLoginToBeTheEmail)) {
-                        echo "readonly";
-                    } ?>    >
-        </div>
-    </div>
-    <div class="col-md-2">
-        <?php
-        if ($user->getEmailVerified()) {
-            ?>
-            <span class="btn btn-success"><i class="fa fa-check"></i> <?php echo __("E-mail Verified"); ?></span>
-            <?php
-        } else {
-            ?>
-            <button class="btn btn-warning" id="verifyEmail"><i class="fa fa-envelope"></i> <?php echo __("Verify e-mail"); ?></button>
-
-            <script>
-                $(document).ready(function () {
-
-                    $('#verifyEmail').click(function (e) {
-                        e.preventDefault();
-                        modal.showPleaseWait();
-                        $.ajax({
-                            type: "POST",
-                            url: "<?php echo $global['webSiteRootURL'] ?>objects/userVerifyEmail.php?users_id=<?php echo $user->getBdId(); ?>"
-                                        }).done(function (response) {
-                                            if (response.error) {
-                                                swal("<?php echo __("Sorry!"); ?>", response.msg, "error");
-                                            } else {
-                                                swal("<?php echo __("Congratulations!"); ?>", "<?php echo __("Verification Sent"); ?>", "success");
-                                            }
-                                            modal.hidePleaseWait();
-                                        });
-                                    });
-
-                                });
-            </script>
-            <?php
-        }
-        ?>
-    </div>
-</div>
-
-<div class="form-group">
-    <label class="col-md-4 control-label"><?php echo __("New Password"); ?></label>
-    <div class="col-md-8 inputGroupContainer">
-        <div class="input-group">
-            <span class="input-group-addon"><i class="glyphicon glyphicon-lock"></i></span>
-            <input  id="inputPassword" placeholder="<?php echo __("New Password"); ?>" class="form-control"  type="password" value="" autocomplete="off" >
-        </div>
-    </div>
-</div>
-
-<div class="form-group">
-    <label class="col-md-4 control-label"><?php echo __("Confirm New Password"); ?></label>
-    <div class="col-md-8 inputGroupContainer">
-        <div class="input-group">
-            <span class="input-group-addon"><i class="glyphicon glyphicon-lock"></i></span>
-            <input  id="inputPasswordConfirm" placeholder="<?php echo __("Confirm New Password"); ?>" class="form-control"  type="password" value="" autocomplete="off" >
-        </div>
-    </div>
-</div>
-
-<div class="form-group <?php if(!empty($advancedCustomUser->doNotShowMyChannelNameOnBasicInfo)){echo " hidden ";} ?>">
-    <label class="col-md-4 control-label"><?php echo __("Channel Name"); ?></label>
-    <div class="col-md-8 inputGroupContainer">
-        <div class="input-group">
-            <span class="input-group-addon"><i class="fas fa-play-circle"></i></span>
-            <input  id="channelName" placeholder="<?php echo __("Channel Name"); ?>" class="form-control"  type="text" value="<?php echo $user->getChannelName(); ?>" >
-        </div>
-    </div>
-</div>
-
-<div class="form-group <?php if(empty($advancedCustomUser->allowDonationLink)){echo " hidden ";} ?>">
-    <label class="col-md-4 control-label"><?php echo __("Donation Link"); ?></label>
-    <div class="col-md-8 inputGroupContainer">
-        <div class="input-group">
-            <span class="input-group-addon"><i class="fas fa-donate"></i></span>
-            <input  id="donationLink" placeholder="<?php echo __("Donation Link"); ?>" class="form-control"  type="url" value="<?php echo $user->getDonationLink(); ?>" >
-        </div>
-    </div>
-</div>
-
-<div class="form-group <?php if(!empty($advancedCustomUser->doNotShowMyAnalyticsCodeOnBasicInfo)){echo " hidden ";} ?>">
-    <label class="col-md-4 control-label"><?php echo __("Analytics Code"); ?></label>
-    <div class="col-md-8 inputGroupContainer">
-        <div class="input-group">
-            <span class="input-group-addon"><i class="fas fa-chart-line"></i></span>
-            <input  id="analyticsCode" placeholder="UA-123456789-1" class="form-control"  type="text" value="<?php echo $user->getAnalyticsCode(); ?>" >
-        </div>
-        <small><?php echo __("Track your videos with Google analytics"); ?></small>
-    </div>
-</div>
-
-<div class="form-group <?php if(!empty($advancedCustomUser->doNotShowMyAboutOnBasicInfo)){echo " hidden ";} ?> ">
-    <label class="col-md-4 control-label"><?php echo __("About"); ?></label>
-    <div class="col-md-8 inputGroupContainer">
-        <textarea id="textAbout" placeholder="<?php echo __("About"); ?>" class="form-control"  ><?php echo $user->getAbout(); ?></textarea>
-    </div>
-</div>
-
-<?php
-AVideoPlugin::getMyAccount(User::getId());
-?>
-
-<div class="form-group">
-    <div class="col-md-12 ">
-        <div id="croppie"></div>
-        <center>
-            <a id="upload-btn" class="btn btn-primary"><i class="fa fa-upload"></i> <?php echo __("Upload a Photo"); ?></a>
-        </center>
-    </div>
-    <input type="file" id="upload" value="Choose a file" accept="image/*" style="display: none;" />
-</div>
-
-<div class="form-group">
-    <div class="col-md-12 ">
-        <div id="croppieBg"></div>
-        <center>
-            <a id="upload-btnBg" class="btn btn-success"><i class="fa fa-upload"></i> <?php echo __("Upload a Background"); ?></a>
-        </center>
-    </div>
-    <input type="file" id="uploadBg" value="Choose a file" accept="image/*" style="display: none;" />
-</div>
-<script>
-    var uploadCrop;
-
-    function isAnalytics() {
-        return true;
-        str = $('#analyticsCode').val();
-        return str === '' || (/^ua-\d{4,9}-\d{1,4}$/i).test(str.toString());
+<style>
+    .file-caption {
+        padding: 6px 12px !important;
     }
-    function readFile(input, crop) {
-        console.log(input);
-        console.log($(input)[0]);
-        console.log($(input)[0].files);
-        if ($(input)[0].files && $(input)[0].files[0]) {
-            var reader = new FileReader();
 
-            reader.onload = function (e) {
-                crop.croppie('bind', {
-                    url: e.target.result
-                }).then(function () {
-                    console.log('jQuery bind complete');
-                });
+    .file-preview-frame,
+    .krajee-default.file-preview-frame .kv-file-content {
+        width: 95%;
+        height: auto;
+    }
 
+    #updateUserForm>div>div>div>span {
+        min-width: 50px;
+        ;
+    }
+</style>
+<form class="form-compact form-horizontal accountForm" id="updateUserForm" onsubmit="">
+    <?php
+    $bgURL = User::getBackgroundURLFromUserID(User::getId());
+    ?>
+    <h2 class="accountSectionTitle"><?php echo __("Basic Info"); ?></h2>
+    <div class="form-group">
+        <label class="col-md-4 control-label"><?php echo __("Name"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <div class="input-group">
+                <span class="input-group-addon"><i class="glyphicon glyphicon-pencil"></i></span>
+                <input id="inputName" placeholder="<?php echo __("Name"); ?>" class="form-control" type="text" value="<?php echo $user->getName(); ?>" required>
+            </div>
+        </div>
+    </div>
+    <?php
+    include $global['systemRootPath'] . 'view/userBasicInfoUserAndEmail.php';
+    ?>
+    <div class="form-group">
+        <label class="col-md-4 control-label"><?php echo __("New Password"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <?php
+            getInputPassword("inputPassword", 'class="form-control"  autocomplete="off"', __("New Password"));
+            ?>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-md-4 control-label"><?php echo __("Confirm New Password"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <?php
+            getInputPassword("inputPasswordConfirm", 'class="form-control"  autocomplete="off"', __("Confirm New Password"));
+            ?>
+        </div>
+    </div>
+
+    <div class="form-group <?php
+                            if (!empty($advancedCustomUser->doNotShowPhone)) {
+                                echo " hidden ";
+                            }
+                            ?>">
+        <label class="col-md-4 control-label"><?php echo __("Phone"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <div class="input-group">
+                <span class="input-group-addon"><i class="fas fa-phone"></i></span>
+                <input id="phone" placeholder="<?php echo __("Phone"); ?>" class="form-control" type="text" value="<?php echo $user->getPhone(); ?>">
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-md-4 control-label"><?php echo __("Birth Date"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <div class="input-group">
+                <span class="input-group-addon"><i class="fa-solid fa-cake-candles"></i></span>
+                <input id="inputBirth" placeholder="<?php echo __("Birth Date"); ?>" class="form-control" type="date" value="<?php echo $user->getBirth_date(); ?>">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group <?php
+                            if (!empty($advancedCustomUser->doNotShowMyChannelNameOnBasicInfo)) {
+                                echo " hidden ";
+                            }
+                            ?>">
+        <label class="col-md-4 control-label"><?php echo __("Channel Name"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <div class="input-group">
+                <span class="input-group-addon"><i class="fas fa-play-circle"></i></span>
+                <input id="channelName" placeholder="<?php echo __("Channel Name"); ?>" class="form-control" type="text" value="<?php echo $user->getChannelName(); ?>">
+            </div>
+        </div>
+    </div>
+
+    <?php
+    if (User::canUpload() || User::canStream()) {
+        $embedURL = "{$global['webSiteRootURL']}channel/" . $user->getChannelName() . '/liveNow';
+        $embedURL = addQueryStringParameter($embedURL, 'muted', 1);
+        $search = ['{embedURL}', '{videoLengthInSeconds}'];
+        $replace = [$embedURL, 0];
+    ?>
+        <div class="form-group">
+            <label class="col-md-4 control-label">
+                <?php echo __("Embed Player"); ?>
+                <br>
+                <?php getButtontCopyToClipboard('textAreaEmbed'); ?>
+            </label>
+            <div class="col-md-8 inputGroupContainer">
+                <textarea class="form-control" rows="2" id="textAreaEmbed" readonly="readonly"><?php
+                                                                                                                                        $code = str_replace($search, $replace, $advancedCustom->embedCodeTemplate);
+                                                                                                                                        echo htmlentities($code);
+                                                                                                                                        ?></textarea>
+            </div>
+        </div>
+    <?php
+    }
+    ?>
+    <div class="form-group <?php
+                            if (!class_exists('CustomizeUser') || !CustomizeUser::canUseDonationLink(User::getId())) {
+                                echo " hidden ";
+                            }
+                            ?>">
+        <label class="col-md-4 control-label"><?php echo __("Donation Link"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <div class="input-group">
+                <span class="input-group-addon"><i class="fas fa-donate"></i></span>
+                <input id="donationLink" placeholder="<?php echo __("Donation Link"); ?>" class="form-control" type="url" value="<?php echo $user->getDonationLink(); ?>">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group <?php
+                            if (!empty($advancedCustomUser->doNotShowMyAnalyticsCodeOnBasicInfo)) {
+                                echo " hidden ";
+                            }
+                            ?>">
+        <label class="col-md-4 control-label"><?php echo __("Analytics Code"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <div class="input-group">
+                <span class="input-group-addon"><i class="fas fa-chart-line"></i></span>
+                <input id="analyticsCode" placeholder="UA-123456789-1" class="form-control" type="text" value="<?php echo $user->getAnalyticsCode(); ?>">
+            </div>
+            <small><?php echo __("Track your videos with Google analytics"); ?></small>
+        </div>
+    </div>
+
+    <div class="form-group <?php
+                            if (!empty($advancedCustomUser->doNotShowMyAboutOnBasicInfo)) {
+                                echo " hidden ";
+                            }
+                            ?> ">
+        <label class="col-md-4 control-label"><?php echo __("About"); ?></label>
+        <div class="col-md-8 inputGroupContainer">
+            <textarea id="textAbout" placeholder="<?php echo __("About"); ?>" class="form-control"><?php echo $user->getAbout(); ?></textarea>
+            <?php
+            echo getTinyMCE("textAbout", true, false, false, false, true);
+            ?>
+        </div>
+    </div>
+
+    <h2 class="accountSectionTitle"><?php echo __("Options"); ?></h2>
+    <?php
+    AVideoPlugin::getMyAccount(User::getId());
+    ?>
+    <h2 class="accountSectionTitle"><?php echo __("Profile Photo"); ?> / <?php echo __("Channel Art"); ?></h2>
+    <div class="row accountImages">
+        <div class="col-sm-3">
+            <?php
+            include $global['systemRootPath'] . 'view/userPhotoUploadInclude.php';
+            ?>
+        </div>
+        <div class="col-sm-9">
+            <?php
+            include $global['systemRootPath'] . 'view/userChannelArtUploadInclude.php';
+            ?>
+        </div>
+    </div>
+
+    <!-- Button -->
+    <div class="form-group accountSave">
+        <hr>
+        <div class="col-md-12">
+            <center>
+                <button type="submit" class="btn btn-primary btn-lg" id="saveAccountBtn">
+                    <span class="fa fa-save"></span> <?php echo __("Save"); ?>
+                </button>
+            </center>
+        </div>
+    </div>
+    <script>
+        var uploadCrop;
+        var accountSavePending = false;
+
+        function isAnalytics() {
+            return true;
+            str = $('#analyticsCode').val();
+            return str === '' || (/^ua-\d{4,9}-\d{1,4}$/i).test(str.toString());
+        }
+
+        function updateUserFormSubmit() {
+            if (accountSavePending) { return; }
+            accountSavePending = true;
+            $('#saveAccountBtn').prop('disabled', true);
+            $('#updateUserForm').attr('aria-busy', 'true');
+            var content = $('#textAbout').val();
+            if (window.tinyMCE && tinyMCE.get('textAbout')) {
+                content = tinyMCE.get('textAbout').getContent();
             }
 
-            reader.readAsDataURL($(input)[0].files[0]);
-        } else {
-            swal("Sorry - you're browser doesn't support the FileReader API");
-        }
-    }
-
-    function updateUserFormSubmit() {
-
-        $.ajax({
-            url: '<?php echo $global['webSiteRootURL']; ?>objects/userUpdate.json.php',
-            data: {
-                "user": $('#inputUser').val(),
-                "pass": $('#inputPassword').val(),
-                "email": $('#inputEmail').val(),
-                "name": $('#inputName').val(),
-                "about": $('#textAbout').val(),
-                "channelName": $('#channelName').val(),
-                "donationLink": $('#donationLink').val(),
-                "analyticsCode": $('#analyticsCode').val()
-            },
-            type: 'post',
-            success: function (response) {
-                if (response.status > "0") {
-                    uploadCrop.croppie('result', {
-                        type: 'canvas',
-                        size: 'viewport'
-                    }).then(function (resp) {
-                        console.log("userSavePhoto");
-                        $.ajax({
-                            type: "POST",
-                            url: "<?php echo $global['webSiteRootURL']; ?>objects/userSavePhoto.php",
-                            data: {
-                                imgBase64: resp
-                            },
-                            success: function () {
-                                console.log("userSaveBackground");
-                                uploadCropBg.croppie('result', {
-                                    type: 'canvas',
-                                    size: 'viewport'
-                                }).then(function (resp) {
-                                    $.ajax({
-                                        type: "POST",
-                                        url: "<?php echo $global['webSiteRootURL']; ?>objects/userSaveBackground.php",
-                                        data: {
-                                            imgBase64: resp
-                                        }, success: function (response) {
-                                            console.log("SavePersonal");
-                                            modal.hidePleaseWait();
-<?php if (empty($advancedCustomUser->disablePersonalInfo)) { ?>
-                                                savePersonalInfo();
-<?php } ?>
-                                        }
-                                    });
-                                });
-                            }
-                        });
-                    });
-                } else if (response.error) {
-                    swal("<?php echo __("Sorry!"); ?>", response.error, "error");
-                    modal.hidePleaseWait();
-                } else {
-                    swal("<?php echo __("Sorry!"); ?>", "<?php echo __("Your user has NOT been updated!"); ?>", "error");
+            $.ajax({
+                url: webSiteRootURL + 'objects/userUpdate.json.php?do_not_login=1',
+                data: {
+                    "user": $('#inputUser').val(),
+                    "pass": $('#inputPassword').val(),
+                    "email": $('#inputEmail').val(),
+                    "phone": $('#phone').val(),
+                    "birth_date": $('#inputBirth').val(),
+                    "name": $('#inputName').val(),
+                    "about": content,
+                    "channelName": $('#channelName').val(),
+                    "donationLink": $('#donationLink').val(),
+                    "analyticsCode": $('#analyticsCode').val(),
+                },
+                type: 'post',
+                success: function(response) {
+                    avideoResponse(response);
+                },
+                error: function() {
+                    avideoToastError(__('An error occurred'));
+                },
+                complete: function() {
+                    accountSavePending = false;
+                    $('#saveAccountBtn').prop('disabled', false);
+                    $('#updateUserForm').attr('aria-busy', 'false');
                     modal.hidePleaseWait();
                 }
-            }
-        });
-    }
-    $(document).ready(function () {
-        $('#upload').on('change', function () {
-            readFile(this, uploadCrop);
-        });
-        $('#upload-btn').on('click', function (ev) {
-            $('#upload').trigger("click");
-        });
-        $('#uploadBg').on('change', function () {
-            readFile(this, uploadCropBg);
-        });
-        $('#upload-btnBg').on('click', function (ev) {
-            $('#uploadBg').trigger("click");
-        });
-<?php
-if (!empty($advancedCustomUser->forceLoginToBeTheEmail)) {
-    ?>
-            $('#inputUser').on('keyup', function () {
-                $('#inputEmail').val($(this).val());
             });
-    <?php
-}
-?>
-
-
-        uploadCrop = $('#croppie').croppie({
-            url: '<?php echo $user->getPhoto(); ?>',
-            enableExif: true,
-            enforceBoundary: false,
-            mouseWheelZoom: false,
-            viewport: {
-                width: 150,
-                height: 150
-            },
-            boundary: {
-                width: 150,
-                height: 150
-            }
-        });
-
-        uploadCropBg = $('#croppieBg').croppie({
-            url: '<?php echo $user->getBackgroundURL(); ?>',
-            enableExif: true,
-            enforceBoundary: false,
-            mouseWheelZoom: false,
-            viewport: {
-                width: 1250,
-                height: 250
-            },
-            boundary: {
-                width: 1250,
-                height: 250
-            }
-        });
-        $('#updateUserForm').submit(function (evt) {
-            evt.preventDefault();
-            if (!isAnalytics()) {
-                swal("<?php echo __("Sorry!"); ?>", "<?php echo __("Your analytics code is wrong"); ?>", "error");
-                $('#inputAnalyticsCode').focus();
-                return false;
-            }
-            $('#aBasicInfo').tab('show');
-            modal.showPleaseWait();
-            var pass1 = $('#inputPassword').val();
-            var pass2 = $('#inputPasswordConfirm').val();
-            // password dont match
-            if (pass1 != '' && pass1 != pass2) {
-                modal.hidePleaseWait();
-                swal("<?php echo __("Sorry!"); ?>", "<?php echo __("Your password does not match!"); ?>", "error");
-                return false;
-            } else {
-                setTimeout(function () {
+        }
+        $(document).ready(function() {
+            $('#updateUserForm').submit(function(evt) {
+                evt.preventDefault();
+                if (accountSavePending) { return false; }
+                if (!isAnalytics()) {
+                    avideoAlert("<?php echo __("Sorry!"); ?>", "<?php echo __("Your analytics code is wrong"); ?>", "error");
+                    $('#inputAnalyticsCode').focus();
+                    return false;
+                }
+                $('#aBasicInfo').tab('show');
+                modal.showPleaseWait();
+                var pass1 = $('#inputPassword').val();
+                var pass2 = $('#inputPasswordConfirm').val();
+                // Password doesn't match
+                if (pass1 != '' && pass1 != pass2) {
+                    modal.hidePleaseWait();
+                    avideoAlert("<?php echo __("Sorry!"); ?>", "<?php echo __("Your password does not match!"); ?>", "error");
+                    return false;
+                } else {
                     updateUserFormSubmit();
-                }, 1000);
-                return false;
-            }
+                    return false;
+                }
+            });
         });
-    });
-</script>
+    </script>
+</form>

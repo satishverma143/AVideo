@@ -3,10 +3,11 @@
 /**
  * Convert ISO 8601 values like PT15M33S
  * to a total value of seconds.
- * 
+ *
  * @param string $ISO8601
  */
-function ISO8601ToSeconds($ISO8601) {
+function ISO8601ToSeconds($ISO8601)
+{
     preg_match('/\d{1,2}[H]/', $ISO8601, $hours);
     preg_match('/\d{1,2}[M]/', $ISO8601, $minutes);
     preg_match('/\d{1,2}[S]/', $ISO8601, $seconds);
@@ -25,12 +26,13 @@ function ISO8601ToSeconds($ISO8601) {
     $minutes = intval(@$minutes);
     $seconds = intval(@$seconds);
 
-    $toltalSeconds = ($hours * 60 * 60) + ($minutes * 60) + $seconds;
+    $totalSeconds = ($hours * 60 * 60) + ($minutes * 60) + $seconds;
 
-    return $toltalSeconds;
+    return $totalSeconds;
 }
 
-function ISO8601ToDuration($ISO8601) {
+function ISO8601ToDuration($ISO8601)
+{
     $seconds = ISO8601ToSeconds($ISO8601);
     return secondsToVideoTime($seconds);
 }
@@ -46,16 +48,13 @@ $obj->error = true;
 $obj->msg = array();
 $obj->playListId = 0;
 
-
 $objo = AVideoPlugin::getObjectDataIfEnabled('BulkEmbed');
-if (empty($objo) || ($objo->onlyAdminCanBulkEmbed && !User::isAdmin())) {
+
+if(!BulkEmbed::canBulkEmbed()){
     $obj->msg[] = __("Permission denied");
     $obj->msg[] = "Plugin disabled";
-} else if (!User::canUpload()) {
-    $obj->msg[] = __("Permission denied");
-    $obj->msg[] = "User can not upload videos";
 } else if (!empty($_POST['itemsToSave'])) {
-    
+
     if (!empty($_POST['playListName'])) {
         require_once $global['systemRootPath'] . 'objects/playlist.php';
         $playList = new PlayList(0);
@@ -71,15 +70,45 @@ if (empty($objo) || ($objo->onlyAdminCanBulkEmbed && !User::isAdmin())) {
             $value[$key] = xss_esc($value2);
         }
         //$info = url_get_contents($config->getEncoderURL() . "getLinkInfo/" . base64_encode($value));
-        //$infoObj = json_decode($info);
-        $filename = uniqid("_YPTuniqid_", true);
+        //$infoObj = _json_decode($info);
+        $paths = Video::getNewVideoFilename();
+        $filename = $paths['filename'];
         $videos = new Video();
         $videos->setFilename($filename);
         $videos->setTitle($value['title']);
         $videos->setDescription($value['description']);
         $videos->setClean_title($value['title']);
         $videos->setDuration(ISO8601ToDuration($value['duration']));
-        file_put_contents($global['systemRootPath'] . "videos/{$filename}.jpg", url_get_contents($value['thumbs']));
+
+        // Set the original video date if available in the form data
+        if (!empty($value['date']) && $objo->useOriginalYoutubeDate) {
+            //_error_log("Do save original date");
+            $global['allowModifyCreated'] = 1;
+            $videos->setCreated($value['date']); // Set the original creation date of the video
+        }else{
+            //_error_log("Do not save original date");
+        }
+
+        $poster = Video::getPathToFile("{$paths['filename']}.jpg");
+        $thumbs = $value['thumbs'];
+        if (!empty($thumbs)) {
+            // Security: SSRF protection for user-supplied thumbnail URLs
+            $resolvedIP_thumbs = null;
+            if (!isSSRFSafeURL($thumbs, $resolvedIP_thumbs)) {
+                _error_log("BulkEmbed: SSRF protection blocked thumbnail URL: " . $thumbs);
+            } else {
+                $contentThumbs = ssrfPinnedFetch($thumbs, $resolvedIP_thumbs);
+                if (!empty($contentThumbs)) {
+                    make_path($poster);
+                    $bytes = file_put_contents($poster, $contentThumbs);
+                    _error_log("thumbs={$thumbs} poster=$poster bytes=$bytes strlen=" . strlen($contentThumbs));
+                } else {
+                    _error_log("ERROR thumbs={$thumbs} poster=$poster");
+                }
+            }
+        } else {
+            _error_log("ERROR thumbs={$thumbs} poster=$poster");
+        }
         $videos->setVideoLink($value['link']);
         $videos->setType('embed');
 
@@ -87,14 +116,17 @@ if (empty($objo) || ($objo->onlyAdminCanBulkEmbed && !User::isAdmin())) {
         try {
             $resp = $videos->save(true);
         } catch (Exception $exc) {
+            _error_log("First save attempt failed: " . $exc->getMessage());
             try {
                 $resp = $videos->save(true);
             } catch (Exception $exc) {
-                continue;
+                _error_log("Second save attempt failed: " . $exc->getMessage());
+                continue;  // Skip to the next video if saving fails
             }
         }
-        
-        if(!empty($resp) && !empty($obj->playListId)){
+
+
+        if (!empty($resp) && !empty($obj->playListId)) {
             $playList = new PlayList($obj->playListId);
             $playList->addVideo($resp, true);
         }
@@ -103,7 +135,7 @@ if (empty($objo) || ($objo->onlyAdminCanBulkEmbed && !User::isAdmin())) {
 
         AVideoPlugin::saveVideosAddNew($_POST, $resp);
 
-        $obj->msg[] = Video::getVideoLight($resp);
+        $obj->msg[] = array('video'=>Video::getVideoLight($resp), 'value'=>$value, 'videos_id'=>$resp);
     }
 
     $obj->error = false;

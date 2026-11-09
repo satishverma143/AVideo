@@ -3,13 +3,17 @@
 require_once $global['systemRootPath'] . 'plugin/Plugin.abstract.php';
 
 require_once $global['systemRootPath'] . 'plugin/VimeoAPI/Objects/VimeoUploads.php';
-require_once $global['systemRootPath'] . 'plugin/VimeoAPI/vimeo-api/autoload.php';
+require_once $global['systemRootPath'] . 'vendor/vimeo/vimeo-api/autoload.php';
 
 use Vimeo\Vimeo;
 use Vimeo\Exceptions\VimeoUploadException;
 
 class VimeoAPI extends PluginAbstract {
 
+    public function getTags() {
+        return array(
+        );
+    }
     public function getDescription() {
         $txt = "Upload your videos to Vimeo using the Vimeo API.<br>";
         $txt .= "<a href='https://developer.vimeo.com/apps/'>Create an APP and get your credentials here</a><br>";
@@ -44,7 +48,7 @@ class VimeoAPI extends PluginAbstract {
 
     public function afterNewVideo($videos_id) {
         $vimeoObj = $this->getDataObject();
-        if ($obj->automaticallyUploadToVimeo) {
+        if ($vimeoObj->automaticallyUploadToVimeo) {
             $this->upload($videos_id);
         }
     }
@@ -72,15 +76,15 @@ class VimeoAPI extends PluginAbstract {
             return $object;
         }
 
-        $source = Video::getHigestResolutionVideoMP4Source($video->getFilename());
+        $source = Video::getHigestResolutionVideoMP4Source($video->getFilename(), false, true);
         $file_name = $source['path'];
-        
+
         if(!file_exists($file_name)){
             $object->msg = __("Video MP4 File was not found");
             _error_log('Vimeo::upload ' . $object->msg." $file_name");
             return $object;
         }
-        
+
         $vimeoObj = $this->getDataObject();
         if (empty($vimeoObj->access_token)) {
             $object->msg = 'You can not upload a file without an access token. You can find this token on your app page';
@@ -144,7 +148,7 @@ class VimeoAPI extends PluginAbstract {
             // We may have had an error. We can't resolve it here necessarily, so report it to the user.
             $object->msg = 'Error uploading (' . $video->getTitle() . ') ' . $e->getMessage();
             _error_log('Vimeo::upload ' . $file_name . ' ' . $object->msg);
-        } catch (VimeoRequestException $e) {
+        } catch (Exception $e) {
             $object->msg = 'Error uploading (' . $video->getTitle() . ') ' . $e->getMessage();
             _error_log('Vimeo::upload ' . $file_name . ' ' . $object->msg);
         }
@@ -164,9 +168,9 @@ class VimeoAPI extends PluginAbstract {
                                         type: 'post',
                                         success: function (response) {
                                             if(response.error){
-                                                swal('" . __("Sorry!") . "', response.msg, 'error');
+                                                avideoAlert('" . __("Sorry!") . "', response.msg, 'error');
                                             }else{
-                                                swal('" . __("Congratulations!") . "', response.msg, 'success');
+                                                avideoAlert('" . __("Congratulations!") . "', response.msg, 'success');
                                             }
                                             console.log(response);
                                             modal.hidePleaseWait();
@@ -179,21 +183,21 @@ class VimeoAPI extends PluginAbstract {
                                         url: '{$global['webSiteRootURL']}plugin/VimeoAPI/uploadAll.json.php',
                                         success: function (response) {
                                             if(response.error){
-                                                swal('" . __("Sorry!") . "', response.msg, 'error');
+                                                avideoAlert('" . __("Sorry!") . "', response.msg, 'error');
                                             }else{
-                                                swal('" . __("Congratulations!") . "', response.msg, 'success');
+                                                avideoAlert('" . __("Congratulations!") . "', response.msg, 'success');
                                             }
                                             console.log(response);
                                         }
                                     });
-                swal('" . __("Process Start") . "', 'It may take a while', 'warning');                    
+                avideoAlert('" . __("Process Start") . "', 'It may take a while', 'warning');
                 }</script>";
         }
         return $js;
     }
 
     public function getVideosManagerListButton() {
-        $btn = '<br><button type="button" class="btn btn-default btn-light btn-sm btn-xs " onclick="vimeoUpload(\' + row.id + \');" data-row-id="right"  data-toggle="tooltip" data-placement="left" title="Upload to Vimeo"><i class="fab fa-vimeo-v"></i> Upload</button>';
+        $btn = '<button type="button" class="btn btn-default btn-light btn-sm btn-xs  btn-block" onclick="vimeoUpload(\' + row.id + \');" data-row-id="right"  data-toggle="tooltip" data-placement="left" title="Upload to Vimeo"><i class="fab fa-vimeo-v"></i> Upload</button>';
         return $btn;
     }
 

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'autoload.php';
 
 global $global, $config;
 if (!isset($global['systemRootPath'])) {
@@ -7,32 +8,47 @@ if (!isset($global['systemRootPath'])) {
 require_once $global['systemRootPath'] . 'objects/user.php';
 
 if (!User::isAdmin()) {
-    header("Location: {$global['webSiteRootURL']}?error=" . __("You can not do this"));
+    forbiddenPage("You can not do this");
     exit;
 }
+if (!isGlobalTokenValid()) {
+    die('{"error":"' . __('Invalid or missing CSRF token') . '"}');
+}
 
+setRowCount(10000);
 header('Content-Type: application/json');
 if (empty($_POST['email'])) {
-    $users = User::getAllUsers();
+    if (!empty($_REQUEST['users_groups_id'])) {
+        $users = User::getAllUsersFromUsergroup(
+            $_REQUEST['users_groups_id'],
+            false,
+            ['name', 'email', 'user', 'channelName', 'about'],
+            'a'
+        );
+    } else {
+        $users = User::getAllUsers(
+            false,
+            ['name', 'email', 'user', 'channelName', 'about'],
+            'a'
+        );
+    }
 } else {
     $users[0]["email"] = $_POST['email'];
 }
-require_once $global['systemRootPath'] . 'objects/PHPMailer/src/PHPMailer.php';
-require_once $global['systemRootPath'] . 'objects/PHPMailer/src/SMTP.php';
-require_once $global['systemRootPath'] . 'objects/PHPMailer/src/Exception.php';
 // send 100 emails at a time
 $mailsLimit = 100;
 
 $obj = new stdClass();
 $obj->error = false;
-$obj->msg = array();
+$obj->msg = [];
+$obj->message = $_POST['message'];
 //Create a new PHPMailer instance
-$mail = new PHPMailer\PHPMailer\PHPMailer;
+$mail = new \PHPMailer\PHPMailer\PHPMailer();
 setSiteSendMessage($mail);
 //Set who the message is to be sent from
 $mail->setFrom($config->getContactEmail());
 $mail->Subject = 'Message From Site ' . $config->getWebSiteTitle();
-$mail->msgHTML($_POST['message']);
+$mail->msgHTML($obj->message);
 $count = 0;
 $currentCount = 0;
 foreach ($users as $value) {

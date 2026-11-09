@@ -4,14 +4,20 @@ require_once $global['systemRootPath'] . 'plugin/Plugin.abstract.php';
 
 class LoginTwitter extends PluginAbstract {
 
+    public function getTags() {
+        return array(
+            PluginTags::$FREE,
+            PluginTags::$LOGIN,
+        );
+    }
     public function getDescription() {
         global $global;
         $obj = $this->getLogin();
         $name = $obj->type;
         $str = "Login with {$name} OAuth Integration";
         $str .= "<br><a href='{$obj->linkToDevelopersPage}'>Get {$name} ID and Key</a>"
-        . "<br>Valid OAuth redirect URIs: <strong>{$global['webSiteRootURL']}objects/login.json.php?type=$name</strong>"
-        . "<br>For mobile a Valid OAuth redirect URIs: <strong>{$global['webSiteRootURL']}plugin/MobileManager/oauth2.php?type=$name</strong>";
+        . "<br>Valid OAuth redirect URIs: <strong>{$global['webSiteRootURL']}objects/login.json.php</strong>"
+        . "<br>For mobile a Valid OAuth redirect URIs: <strong>{$global['webSiteRootURL']}plugin/MobileManager/oauth2.php</strong>";
         return $str;
     }
 
@@ -31,18 +37,17 @@ class LoginTwitter extends PluginAbstract {
         global $global;
         $obj = new stdClass();                
         $obj->id = "";
+        self::addDataObjectHelper('id', 'Consumer API Key');
+
         $obj->key = "";
+        self::addDataObjectHelper('key', 'Consumer API Key Secret');
+
         return $obj;
     }
-    
-    public function getTags() {
-        return array('free', 'login', 'twitter');
-    }
-    
     public function getLogin() {
         $obj = new stdClass();
         $obj->class = "btn btn-info btn-block"; 
-        $obj->icon = "fab fa-twitter"; 
+        $obj->icon = "fa-brands fa-x-twitter"; 
         $obj->type = "Twitter"; 
         $obj->linkToDevelopersPage = "https://apps.twitter.com/";         
         return $obj;

@@ -1,14 +1,14 @@
 <?php
 header('Content-Type: application/json');
 global $global, $config;
-if(!isset($global['systemRootPath'])){
+if (!isset($global['systemRootPath'])) {
     require_once '../videos/configuration.php';
 }
 
-if(!User::isLogged()){
+if (!User::isLogged()) {
     die("Is not logged");
 }
-
+$_REQUEST["do_not_login"]=1;
 require_once $global['systemRootPath'] . 'objects/user.php';
 $user = new User(0);
 $user->loadSelfUser();

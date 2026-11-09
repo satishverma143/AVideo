@@ -10,6 +10,11 @@ require_once $global['systemRootPath'] . 'objects/subscribe.php';
 class SlackBot extends PluginAbstract
 {
 
+    public function getTags() {
+        return array(
+            PluginTags::$FREE,
+        );
+    }
     public function getDescription()
     {
         return "Send video upload notifications to Users on Slack who have subscribed to the channel via a Slack Bot.
@@ -29,14 +34,7 @@ class SlackBot extends PluginAbstract
     {
         return "cf145581-7d5e-4bb6-8c13-848a19j1564a";
     }
-    public function getTags()
-    {
-        return array(
-            'free',
-            'notifications',
-            'bot'
-        );
-    }
+    
     public function getPluginVersion()
     {
         return "1.0";
@@ -57,7 +55,7 @@ class SlackBot extends PluginAbstract
         $users_id         = Video::getOwner($videos_id);
         $user             = new User($users_id);
         $usersSubscribed  = Subscribe::getAllSubscribes($users_id);
-        $username         = $user->getNameIdentification();
+        $username         = $user->getNameIdentificationBd();
         $channelName      = $user->getChannelName();
         $video            = new Video("", "", $videos_id);
         $videoName        = $video->getTitle();
@@ -82,7 +80,7 @@ class SlackBot extends PluginAbstract
                 curl_setopt($c, CURLOPT_HTTPHEADER, $headers);
                 curl_setopt($c, CURLOPT_RETURNTRANSFER, true);
                 $result = curl_exec($c);
-                $userSlackInformation = json_decode($result);
+                $userSlackInformation = _json_decode($result);
                 if ($userSlackInformation->ok == true) {
                     $slackChannel = $userSlackInformation->user->id;
                 } else {
@@ -93,6 +91,7 @@ class SlackBot extends PluginAbstract
 
                 if ($slackChannel != "") {
                     //Send the message to the user as a slack bot if the slack channel was returned for the users email
+                    $paylod = new stdClass();
                     $paylod->text     = $username . " just uploaded a video\nVideo Name: " . $videoName . "\nVideo Link: " . $videoLink . "\nVideo Duration: " . $videoDuration;
                     $paylod->channel  = $slackChannel;
                     $message          = json_encode($paylod);

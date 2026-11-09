@@ -1,279 +1,369 @@
 <?php
 require_once '../../videos/configuration.php';
 require_once $global['systemRootPath'] . 'objects/user.php';
-
+$isLive = 1;
+global $doNotFullScreen;
+$doNotFullScreen = 1;
 $p = AVideoPlugin::loadPlugin("Live");
-
+$obj = $p->getDataObject();
 if (!empty($_GET['c'])) {
     $user = User::getChannelOwner($_GET['c']);
     if (!empty($user)) {
         $_GET['u'] = $user['user'];
     }
 }
-if(!empty($_GET['c'])){
+if (!empty($_GET['c'])) {
     $user = User::getChannelOwner($_GET['c']);
-    if($user['status']!=='a'){
+    if ($user['status'] !== 'a') {
         header("Location: {$global['webSiteRootURL']}");
     }
 }
-if (!empty($_GET['u']) && !empty($_GET['embedv2'])) {
-    include $global['systemRootPath'] . 'plugin/Live/view/videoEmbededV2.php';
+
+if (!empty($_GET['u']) && isAVideoMobileApp()) {
+    $_GET['embed'] = 1;
+}
+useVideoHashOrLogin();
+if (!empty($_GET['u'])) {
+    $livet = LiveTransmition::getFromRequest();
+    //var_dump($livet);exit;
+    $live_servers_id = Live::getLiveServersIdRequest();
+    $live_index = @$_REQUEST['live_index'];
+    //var_dump($live_servers_id);exit;
+    //var_dump($livet['key'],$live_index, $_GET['live_index']);exit;
+    $info = Live::getInfo($livet['key'], $live_servers_id, $live_index, '', false);
+    //var_dump($livet['key'],$live_index, $info);exit;
+    if (!isBot() && !$info['isLive'] && (empty($info['live_schedule_id']) || empty($_REQUEST['live_schedule'])) && empty($_REQUEST['justRedirected'])) {
+        if (!empty($info['otherLivesSameUser'])) {
+            $link = LiveTransmitionHistory::getLinkToLive($info['otherLivesSameUser'][0]['id']);
+            $link = addQueryStringParameter($link, 'justRedirected', 1);
+            $link = addQueryStringParameter($link, 'return_line', $info['return_line']);
+            //var_dump($link, $info['otherLivesSameUser'][0]);exit;
+            //var_dump($link,$info['users_id'], $info['otherLivesSameUser']);exit;
+            _error_log("Redirecting to {$link} info=" . json_encode($info) . ' $_REQUEST=' . json_encode($_REQUEST));
+            header("Location: {$link}");
+            exit;
+            /*
+            if (count($info['otherLivesSameUser']) == 1) {
+
+            } else {
+                // list all lives available
+            }
+             *
+             */
+        }
+    }
+
+    setLiveKey($livet['key'], $live_servers_id, $live_index);
+    Live::checkIfPasswordIsGood($livet['key']);
+
+    if (!empty($_GET['embedv2'])) {
+        include $global['systemRootPath'] . 'plugin/Live/view/videoEmbededV2.php';
+    } elseif (!empty($_GET['embed'])) {
+        include $global['systemRootPath'] . 'plugin/Live/view/videoEmbeded.php';
+    } else {
+        include $global['systemRootPath'] . 'plugin/Live/view/modeYoutubeLive.php';
+    }
     exit;
-} else if (!empty($_GET['u']) && !empty($_GET['embed'])) {
-    include $global['systemRootPath'] . 'plugin/Live/view/videoEmbeded.php';
-    exit;
-} else if (!empty($_GET['u'])) {
-    include $global['systemRootPath'].'plugin/Live/view/modeYoutubeLive.php';
-    exit;
-} else if (!User::canStream()) {
-    header("Location: {$global['webSiteRootURL']}?error=" . __("You can not stream live videos"));
-    exit;
+} else {
+    if (!User::isLogged()) {
+        gotToLoginAndComeBackHere("");
+        exit;
+    } elseif (!User::canStream()) {
+        forbiddenPage(__($obj->streamDeniedMsg));
+    }
 }
 
 require_once $global['systemRootPath'] . 'objects/userGroups.php';
 require_once $global['systemRootPath'] . 'objects/functions.php';
 require_once $global['systemRootPath'] . 'plugin/Live/Objects/LiveTransmition.php';
 
+$users_id = User::getId();
+if (!empty($_GET['users_id']) && User::isAdmin()) {
+    $new_users_id = intval($_GET['users_id']);
+    echo "<!-- did change the users_id from $users_id to $new_users_id -->";
+    $users_id = $new_users_id;
+} else {
+    echo "<!-- did not change the users_id = $users_id -->";
+}
+
 // if user already have a key
-$trasnmition = LiveTransmition::createTransmitionIfNeed(User::getId());
+$trasnmition = LiveTransmition::createTransmitionIfNeed($users_id);
+//var_dump($trasnmition);exit;
+$getLiveKey = ['key' => $trasnmition['key'], 'live_servers_id' => Live::getLiveServersIdRequest()];
+setLiveKey($trasnmition['key'], Live::getLiveServersIdRequest(), @$_REQUEST['live_index']);
 if (!empty($_GET['resetKey'])) {
-    LiveTransmition::resetTransmitionKey(User::getId());
+    LiveTransmition::resetTransmitionKey($users_id);
     header("Location: {$global['webSiteRootURL']}plugin/Live/");
     exit;
 }
 
-$aspectRatio = "16:9";
-$vjsClass = "vjs-16-9";
-
 $trans = new LiveTransmition($trasnmition['id']);
 $groups = $trans->getGroups();
-$obj = $p->getDataObject();
 
 //check if channel name exists
 $channelName = User::getUserChannelName();
 if (empty($channelName)) {
-    $channelName = uniqid();
-    $user = new User(User::getId());
+    $user = new User($users_id);
+    $channelName = $user->getUser();
     $user->setChannelName($channelName);
     $user->save();
 }
-?>
-<!DOCTYPE html>
-<html lang="<?php echo $_SESSION['language']; ?>">
-    <head>
-        <title><?php echo __("Live"); ?> - <?php echo $config->getWebSiteTitle(); ?></title>
-        <link href="<?php echo $global['webSiteRootURL']; ?>js/video.js/video-js.min.css" rel="stylesheet" type="text/css"/>
-        <link href="<?php echo $global['webSiteRootURL']; ?>css/player.css" rel="stylesheet" type="text/css"/>
-        <?php
-        include $global['systemRootPath'] . 'view/include/head.php';
-        ?>
-        <script src="<?php echo $global['webSiteRootURL']; ?>plugin/Live/view/swfobject.js" type="text/javascript"></script>
-        <script src="<?php echo $global['webSiteRootURL']; ?>js/video.js/video.js" type="text/javascript"></script>
-        <script src="<?php echo $global['webSiteRootURL']; ?>plugin/Live/view/videojs-contrib-hls.min.js" type="text/javascript"></script>
-    </head>
-    <body class="<?php echo $global['bodyClass']; ?>">
-        <?php
-        include $global['systemRootPath'] . 'view/include/navbar.php';
-        ?>
-        <div class="container">
-            <div class="col-md-6">
-                <?php
-                if (!empty($obj->experimentalWebcam)) {
-                    ?>
-                    <div class="panel panel-default">
-                        <div class="panel-heading"><?php echo __("WebCam Streaming"); ?></div>
-                        <div class="panel-body">
-                            <div class="embed-responsive embed-responsive-16by9">
-                                <div class="embed-responsive-item"  id="webcam">
-                                    <button class="btn btn-primary btn-block" id="enableWebCam">
-                                        <i class="fa fa-camera"></i> <?php echo __("Enable WebCam Stream"); ?>
-                                    </button>
-                                    <div class="alert alert-warning">
-                                        <i class="fa fa-warning"><?php echo __("We will check if there is a stream conflict before stream"); ?></i>
-                                    </div>
+$col1Class = "col-md-12 col-lg-12";
+$col2Class = "hidden";
+$_GET['noChat'] = 1;
+/* removed due this https://github.com/WWBN/AVideo/issues/7675
+$chat2 = AVideoPlugin::getObjectDataIfEnabled("Chat2");
+if (!empty($chat2) && !empty($chat2->useStaticLayout)) {
+    $col1Class = "col-md-8 col-lg-8";
+    $col2Class = "col-md-4 col-lg-4";
+}
+*/
+$global['doNotLoadPlayer'] = 1;
 
-                                    <div class="alert alert-info">
-                                        <?php echo __("This is an experimental resource"); ?>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+$_page = new Page(array('Live'));
+$_page->setExtraStyles(array('plugin/Live/view/workspace.css'));
+include $global['systemRootPath'] . 'view/bootstrap/fileinput.php';
+?>
+<div class="container-fluid">
+    <div class="panel panel-default workspace-panel">
+        <div class="panel-heading tabbable-line">
+            <ul class="nav nav-tabs">
+                <?php
+                $activeServerFound = false;
+                if (!$obj->useLiveServers) {
+                    $liveStreamObject = new LiveStreamObject($trasnmition['key'], 0, @$_REQUEST['live_index'], 0);
+                    $key = $liveStreamObject->getKeyWithIndex(true);
+                    $activeServerFound = true;
+                    $_REQUEST['live_servers_id'] = 0;
+                ?>
+                    <li class="active <?php echo getCSSAnimationClassAndStyle('animate__fadeInLeft', 'menu'); ?>">
+                        <a href="<?php echo $global['webSiteRootURL']; ?>plugin/Live/?live_servers_id=0">
+                            <i class="fas fa-broadcast-tower"></i> <?php echo __("Local Server"); ?>
+                        </a>
+                    </li>
+                    <?php
+                } else {
+                    $servers = Live::getAllServers();
+                    $activeFound = false;
+                    foreach ($servers as $index => $value) {
+                        $liveStreamObject = new LiveStreamObject($trasnmition['key'], $value['id'], @$_REQUEST['live_index'], 0);
+                        $key = $liveStreamObject->getKeyWithIndex(true);
+                        $active = "";
+                        if (!empty($_REQUEST['live_servers_id'])) {
+                            if ($_REQUEST['live_servers_id'] == $value['id']) {
+                                $activeServerFound = true;
+                                $active = "active";
+                            }
+                        } elseif ($index == 0) {
+                            $_REQUEST['live_servers_id'] = $value['id'];
+                            $activeServerFound = true;
+                            $active = "active";
+                        }
+                    ?>
+                        <li class="<?php echo $active; ?>  <?php echo getCSSAnimationClassAndStyle('animate__fadeInLeft', 'menu'); ?>">
+                            <a href="<?php echo $global['webSiteRootURL']; ?>plugin/Live/?live_servers_id=<?php echo $value['id']; ?>">
+                                <i class="fas fa-broadcast-tower"></i> <?php echo $value['name']; ?>
+                            </a>
+                        </li>
+                    <?php
+                    }
+                    if (User::isAdmin()) {
+                    ?>
+                        <button onclick="avideoModalIframeFullScreen(webSiteRootURL + 'plugin/Live/view/editor.php');" class="btn btn-primary pull-right"><i class="fa fa-edit"></i> Edit Live Servers</button>
+                    <?php
+                    }
+                }
+                if (Live::canStreamWithMeet()) {
+                    ?>
+                    <button onclick="avideoModalIframeFullScreen(webSiteRootURL + 'plugin/Meet/');" class="btn btn-default pull-right">
+                        <i class="fas fa-comments"></i> <span class="hidden-md hidden-sm hidden-xs"><?php echo __("Start a Live Stream Meeting"); ?></span><span class="hidden-lg"><?php echo __("Meeting"); ?></span>
+                    </button>
                     <?php
                 }
-                ?>
-                <div class="panel panel-default">
-                    <div class="panel-heading"><i class="fa fa-share"></i> <?php echo __("Share Info"); ?></div>
-                    <div class="panel-body">          
-                        <div class="form-group">
-                            <label for="playerURL"><i class="fa fa-play-circle"></i> <?php echo __("Player URL"); ?>:</label>
-                            <input type="text" class="form-control" id="playerURL" value="<?php echo $p->getM3U8File($trasnmition['key']); ?>"  readonly="readonly">
-                        </div>       
-                        <div class="form-group">
-                            <label for="avideoURL"><i class="fa fa-circle"></i> <?php echo __("Live URL"); ?>:</label>
-                            <input type="text" class="form-control" id="avideoURL" value="<?php echo $global['webSiteRootURL']; ?>plugin/Live/?c=<?php echo urlencode($channelName); ?>"  readonly="readonly">
-                        </div>   
-                        <div class="form-group">
-                            <label for="embedStream"><i class="fa fa-code"></i> <?php echo __("Embed Stream"); ?>:</label>
-                            <input type="text" class="form-control" id="embedStream" value='<iframe width="640" height="480" style="max-width: 100%;max-height: 100%;" src="<?php echo $global['webSiteRootURL']; ?>plugin/Live/?c=<?php echo urlencode($channelName); ?>&embed=1" frameborder="0" allowfullscreen="allowfullscreen" ></iframe>'  readonly="readonly">
-                        </div>
-                    </div>
-                </div>
-                <div class="panel panel-default">
-                    <div class="panel-heading"><i class="fa fa-hdd-o"></i> <?php echo __("Devices Stream Info"); ?></div>
-                    <div class="panel-body">
-                        <div class="form-group">
-                            <label for="server"><i class="fa fa-server"></i> <?php echo __("Server URL"); ?>:</label>
-                            <input type="text" class="form-control" id="server" value="<?php echo $p->getServer(); ?>?p=<?php echo User::getUserPass(); ?>" readonly="readonly">
-                            <small class="label label-info"><i class="fa fa-warning"></i> <?php echo __("If you change your password the Server URL parameters will be changed too."); ?></small>
-                        </div>
-                        <div class="form-group">
-                            <label for="streamkey"><i class="fa fa-key"></i> <?php echo __("Stream name/key"); ?>:</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="streamkey" value="<?php echo $trasnmition['key']; ?>" readonly="readonly">
-                                <span class="input-group-btn">
-                                    <a class="btn btn-default" href="<?php echo $global['webSiteRootURL']; ?>plugin/Live/?resetKey=1"><i class="fa fa-refresh"></i> <?php echo __("Reset Key"); ?></a>
-                                </span>
-                            </div>
-                            <span class="label label-warning"><i class="fa fa-warning"></i> <?php echo __("Keep Key Private, Anyone with key can broadcast on your account"); ?></span>
-                        </div>
-                    </div>
-                </div>
+                if (empty($activeServerFound)) {
+                    if (!empty($servers[0])) {
+                        $_REQUEST['live_servers_id'] = $servers[0]['id'];
+                    } else {
+                    ?>
+                        <li>
+                            <a href="<?php echo $global['webSiteRootURL']; ?>plugin/Live/view/editor.php" class="btn btn-danger">
+                                <i class="fas fa-exclamation-triangle"></i> <?php echo __("Server not found or inactive"); ?>
+                            </a>
+                        </li>
                 <?php
-                AVideoPlugin::getLivePanel();
-                ?>
-            </div>
-            <div class="col-md-6">
-                <div class="panel panel-default">
-                    <div class="panel-heading">
-                        <?php
-                        $streamName = $trasnmition['key'];
-                        include $global['systemRootPath'] . 'plugin/Live/view/onlineLabel.php';
-                        ?>
-                    </div>
-                    <div class="panel-body">          
-                        <div class="embed-responsive embed-responsive-16by9">
-                            <video poster="<?php echo $global['webSiteRootURL']; ?>plugin/Live/view/OnAir.jpg" controls 
-                                   class="embed-responsive-item video-js vjs-default-skin <?php echo $vjsClass; ?> vjs-big-play-centered" 
-                                   id="mainVideo" data-setup='{ aspectRatio: "<?php echo $aspectRatio; ?>",  "techorder" : ["flash", "html5"] }'>
-                                <source src="<?php echo $p->getM3U8File($trasnmition['key']); ?>" type='application/x-mpegURL'>
-                            </video>
-                        </div>
-                    </div>
-                </div>
-                <div class="panel panel-default">
-                    <div class="panel-heading"><?php echo __("Stream Settings"); ?></div>
-                    <div class="panel-body"> 
-                        <div class="form-group">
-                            <label for="title"><?php echo __("Title"); ?>:</label>
-                            <input type="text" class="form-control" id="title" value="<?php echo $trasnmition['title'] ?>">
-                        </div>    
-                        <div class="form-group">
-                            <label for="description"><?php echo __("Description"); ?>:</label>
-                            <textarea class="form-control" id="description"><?php echo $trasnmition['description'] ?></textarea>
-                        </div>
-                        <!--
-                        -->
-                        <hr>
-                        <div class="form-group">
-                            <span class="fa fa-globe"></span> <?php echo __("Make Stream Publicly Listed"); ?> 
-                            <b>(<?php echo __("MAKE SURE YOU CLICK SAVE"); ?>)</b>
-                            <div class="material-switch pull-right">
-                                <input id="listed" type="checkbox" value="1" <?php echo!empty($trasnmition['public']) ? "checked" : ""; ?>/>
-                                <label for="listed" class="label-success"></label> 
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="panel panel-default">
-                    <div class="panel-heading"><?php echo __("Groups That Can See This Stream"); ?><br><small><?php echo __("Uncheck all to make it public"); ?></small></div>
-                    <div class="panel-body"> 
-                        <?php
-                        $ug = UserGroups::getAllUsersGroups();
-                        foreach ($ug as $value) {
-                            ?>
-                            <div class="form-group">
-                                <span class="fa fa-users"></span> <?php echo $value['group_name']; ?>
-                                <div class="material-switch pull-right">
-                                    <input id="group<?php echo $value['id']; ?>" type="checkbox" value="<?php echo $value['id']; ?>" class="userGroups" <?php echo (in_array($value['id'], $groups) ? "checked" : "") ?>/>
-                                    <label for="group<?php echo $value['id']; ?>" class="label-success"></label>
-                                </div>
-                            </div>
-                            <?php
-                        }
-                        ?>
-                        <button type="button" class="btn btn-success" id="btnSaveStream"><?php echo __("Save Stream"); ?></button>
-                        <a href="<?php echo $global['webSiteRootURL']; ?>usersGroups" class="btn btn-primary"><span class="fa fa-users"></span> <?php echo __("Add more user Groups"); ?></a>
-                    </div>
-                </div>
+                    }
+                }
+                $_REQUEST['live_servers_id'] = Live::getLiveServersIdRequest();
+                $getLiveKey['live_servers_id'] = $_REQUEST['live_servers_id'];
+                $getLiveKey['live_index'] = @$_REQUEST['live_index'];
+                $poster = Live::getRegularPosterImage(User::getId(), $_REQUEST['live_servers_id'], 0, 0);
 
+                $liveStreamObject = new LiveStreamObject($trasnmition['key'], $trasnmition['live_servers_id']);
+                Live::getLiveControls($liveStreamObject->getKeyWithIndex(true, true), $trasnmition['live_servers_id']);
+                ?>
+            </ul>
+        </div>
+        <div class="panel-body">
+            <div class="col-lg-6" id="indexCol1">
+                <h2 class="workspace-section-title"><i class="fas fa-video text-primary" aria-hidden="true"></i> <?php echo __('Broadcast a Live Stream'); ?></h2>
+                <div class="row">
+                    <div class="<?php echo $col1Class; ?>">
+                        <?php
+                        include $global['systemRootPath'] . 'plugin/Live/indexCol1.php';
+                        ?>
+                    </div>
+                    <div class="<?php echo $col2Class; ?>" id="yptRightBar">
+                        <?php
+                        include $global['systemRootPath'] . 'plugin/Live/indexCol2.php';
+                        ?>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 " id="indexCol2">
+                <h2 class="workspace-section-title"><i class="fas fa-sliders-h text-primary" aria-hidden="true"></i> <?php echo __('Live Tools'); ?></h2>
+                <?php
+                include $global['systemRootPath'] . 'plugin/Live/indexCol3.php';
+                ?>
             </div>
         </div>
-        <?php
-        $p->getChat($trasnmition['key']);
-        ?>
-        <?php
-        include $global['systemRootPath'] . 'view/include/footer.php';
-        ?>
-        <script>
-            var flashvars = {server: "<?php echo $p->getServer(); ?>?p=<?php echo User::getUserPass(); ?>", stream: "<?php echo $trasnmition['key']; ?>"};
-                var params = {};
-                var attributes = {};
-                function amIOnline() {
-                    $.ajax({
-                        url: '<?php echo $global['webSiteRootURL']; ?>plugin/Live/stats.json.php?checkIfYouOnline',
-                        data: {"name": "<?php echo $streamName; ?>"},
-                        type: 'post',
-                        success: function (response) {
-                            offLine = true;
-                            for (i = 0; i < response.applications.length; i++) {
-                                if (response.applications[i].key === "<?php echo $trasnmition['key']; ?>") {
-                                    offLine = false;
-                                    break;
-                                }
-                            }
-                            // you online do not show webcam
-                            if (!offLine) {
-                                $('#webcam').find('.alert').text("<?php echo __("You are online now, web cam is disabled"); ?>");
-                            } else {
-                                $('#webcam').find('.alert').text("<?php echo __("You are not online, loading webcam..."); ?>");
-                                swfobject.embedSWF("<?php echo $global['webSiteRootURL']; ?>plugin/Live/view/webcam.swf", "webcam", "100%", "100%", "9.0.0", "expressInstall.swf", flashvars, params, attributes);
-                            }
-                        }
-                    });
+    </div>
+
+</div>
+<script>
+    var flashvars = {
+        server: "<?php echo Live::getRTMPLinkWithOutKeyFromKey($trasnmition['key']); ?>",
+        stream: "<?php echo $trasnmition['key']; ?>"
+    };
+    var params = {};
+    var attributes = {};
+    var isSavingStream = false;
+
+    async function saveStream(_this = null) {
+        if (isSavingStream) {
+            return false;
+        }
+        isSavingStream = true;
+
+        var selectedUserGroups = [];
+        $('.userGroups:checked').each(function() {
+            selectedUserGroups.push($(this).val());
+        });
+
+        if ($(_this).attr('id') == 'recordLive') {
+            if ($(_this).is(":checked")) {
+                $('#isRebroadcast').prop('checked', false);
+            }
+        } else if ($(_this).attr('id') == 'isRebroadcast') {
+            if ($(_this).is(":checked")) {
+                $('#recordLive').prop('checked', false);
+            }
+        }
+
+        if (selectedUserGroups.length > 0) {
+            let confirmResponse = await avideoConfirmUserGroups();
+            if (confirmResponse === 'cancel') {
+                modal.hidePleaseWait();
+                isSavingStream = false;
+                return;
+            } else if (confirmResponse === 'remove') {
+                selectedUserGroups = []; // Remove user groups to make it public
+                $('.userGroups').prop('checked', false); // Uncheck all user groups
+            }
+        }
+
+        modal.showPleaseWait();
+        $.ajax({
+            url: webSiteRootURL + 'plugin/Live/saveLive.php',
+            data: {
+                "title": $('#title').val(),
+                "description": $('#description').val(),
+                "categories_id": $('select[name="categories_id"]').val(),
+                "key": "<?php echo $trasnmition['key']; ?>",
+                "listed": $('#listed').is(":checked"),
+                "saveTransmition": $('#recordLive').is(":checked"),
+                "isRebroadcast": $('#isRebroadcast').is(":checked"),
+                "userGroups": selectedUserGroups,
+                users_id: '<?php echo $users_id; ?>',
+                password: $('#password_livestream').val(),
+                globalToken: '<?php echo getToken(); ?>'
+            },
+            type: 'post',
+            dataType: 'json',
+            success: function(response) {
+                avideoResponse(response);
+            },
+            error: function() {
+                avideoToastError(<?php echo json_encode(__('Could not save stream settings. Please try again.')); ?>);
+            },
+            complete: function() {
+                modal.hidePleaseWait();
+                isSavingStream = false;
+            }
+        });
+    }
+
+    async function avideoConfirmUserGroups() {
+        var span = document.createElement("span");
+        span.innerHTML = __("This live will be private and restricted to selected user groups. Do you want to proceed?", true);
+
+        return await swal({
+            title: __('Confirm Privacy'),
+            content: span,
+            icon: 'warning',
+            closeOnClickOutside: false,
+            closeModal: true,
+            buttons: {
+                cancel: {
+                    text: __("Cancel"),
+                    value: "cancel",
+                    visible: true, // Ensure the cancel button is shown
+                    className: "btn-danger",
+                },
+                confirm: {
+                    text: __("OK, Save as Private"),
+                    value: "confirm",
+                    className: "btn-success",
+                },
+                remove: {
+                    text: __("Remove User Groups and Save as Public"),
+                    value: "remove",
+                    className: "btn-warning",
                 }
+            }
+        });
+    }
 
-                function saveStream() {
-                    modal.showPleaseWait();
 
-                    var selectedUserGroups = [];
-                    $('.userGroups:checked').each(function () {
-                        selectedUserGroups.push($(this).val());
-                    });
-
-                    $.ajax({
-                        url: 'saveLive.php',
-                        data: {
-                            "title": $('#title').val(),
-                            "description": $('#description').val(),
-                            "key": "<?php echo $trasnmition['key']; ?>",
-                            "listed": $('#listed').is(":checked"),
-                            "userGroups": selectedUserGroups
-                        },
-                        type: 'post',
-                        success: function (response) {
-                            modal.hidePleaseWait();
-                        }
-                    });
+    $(document).ready(function() {
+        $('#removePoster').click(function() {
+            modal.showPleaseWait();
+            $.ajax({
+                url: webSiteRootURL + "plugin/Live/removePoster.php?live_servers_id=<?php echo intval($_REQUEST['live_servers_id'] ?? 0); ?>",
+                type: 'post',
+                data: {
+                    globalToken: '<?php echo getToken(); ?>'
+                },
+                success: function(response) {
+                    modal.hidePleaseWait();
+                    if (response.error) {
+                        avideoAlert("<?php echo __("Sorry!"); ?>", response.msg, "error");
+                    } else {
+                        $('#mainVideo video').attr('poster', webSiteRootURL + response.newPoster);
+                        $('#mainVideo .vjs-poster').css('background-image', 'url("' + webSiteRootURL + response.newPoster + '")');
+                        $('.kv-file-content img').attr('src', '<?php echo $global['webSiteRootURL']; ?>' + response.newPoster);
+                    }
                 }
-                $(document).ready(function () {
-                    $('#btnSaveStream').click(function () {
-                        saveStream();
-                    });
-                    $('#enableWebCam').click(function () {
-                        amIOnline();
-                    });
-                });
-        </script>
-    </body>
-</html>
+            });
+        });
+        $('.btnSaveStream').click(function() {
+            saveStream();
+        });
+
+        <?php
+        echo PlayerSkins::getStartPlayerJS("", "", true);
+        ?>
+    });
+</script>
+<?php
+$_page->print();
+?>

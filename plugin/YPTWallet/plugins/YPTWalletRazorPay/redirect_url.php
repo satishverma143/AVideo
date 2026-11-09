@@ -23,7 +23,7 @@ use Razorpay\Api\Errors\SignatureVerificationError;
 
 $success = true;
 $json = file_get_contents('php://input');
-$body = json_decode($json);
+$body = _json_decode($json);
 
 if (!empty($json) && empty($body)) {
     parse_str($json, $body);
@@ -36,7 +36,9 @@ $error = "Payment Failed";
 $api = new Api($obj->api_key, $obj->api_secret);
 // payment
 if (!empty($body['error']['code'])) {
-    header("Location: {$global['webSiteRootURL']}plugin/Subscription/showPlans.php?msg={$body['error']['description']}");
+    $url = Subscription::getBuyURL(); 
+    $url = addQueryStringParameter($url, 'msg', $body['error']['description']);
+    header("Location: {$url}");
 } else
 if (!empty($_POST['razorpay_payment_id']) && !empty($_POST['razorpay_order_id'])) {
 
@@ -60,6 +62,13 @@ if (!empty($_POST['razorpay_payment_id']) && !empty($_POST['razorpay_order_id'])
         $api = new Api($obj->api_key, $obj->api_secret);
         $payment = $api->payment->fetch($_POST['razorpay_payment_id']);
         if ($payment->currency == $displayCurrency) {
+            if(empty($users_id)){
+                if(!empty($payment->notes->users_id)){
+                    $users_id = $payment->notes->users_id;
+                }else{
+                    _error_log("RazorPay redirect_url:  users_id not found 1: ". json_encode($payment));
+                }
+            }
             $plugin->addBalance($users_id, $payment->amount / 100, "RazorPay payment: ", json_encode($attributes));
             if (!empty($_SESSION['addFunds_Success'])) {
                 header("Location: {$_SESSION['addFunds_Success']}");
@@ -96,7 +105,14 @@ if (!empty($_POST['razorpay_payment_id']) && !empty($_POST['razorpay_order_id'])
         if ($payment->currency == $displayCurrency) {
             AVideoPlugin::isEnabledByName('Subscription');
             //$plugin->addBalance($users_id, $payment->amount / 100, "RazorPay payment for subscription: ", json_encode($attributes));
-            $currentSubscription = SubscriptionTable::getSubscription(User::getId(), $payment->notes->plans_id, false, false);
+            if(empty($users_id)){
+                if(!empty($payment->notes->users_id)){
+                    $users_id = $payment->notes->users_id;
+                }else{
+                    _error_log("RazorPay redirect_url:  users_id not found 1: ". json_encode($payment));
+                }
+            }
+            $currentSubscription = SubscriptionTable::getSubscription($users_id, $payment->notes->plans_id, false, false);
             if (empty($currentSubscription)) {
                 // create a subscription here
                 Subscription::getOrCreateGatewaySubscription(User::getId(), $payment->notes->plans_id, SubscriptionTable::$gatway_razorpay, $payment->id);
@@ -109,12 +125,19 @@ if (!empty($_POST['razorpay_payment_id']) && !empty($_POST['razorpay_order_id'])
             } else {
                 //Subscription::renew(User::getId(), $payment->notes->plans_id);
             }
-            header("Location: {$global['webSiteRootURL']}plugin/Subscription/showPlans.php?status=success&msg=We are processing your Payment, you will be notified soon.");
+            $url = Subscription::getBuyURL(); 
+            $url = addQueryStringParameter($url, 'msg', 'We are processing your Payment, you will be notified soon');
+            $url = addQueryStringParameter($url, 'status', 'success');
+            header("Location: {$url}");
         } else {
-            header("Location: {$global['webSiteRootURL']}plugin/Subscription/showPlans.php?status=fail");
+            $url = Subscription::getBuyURL(); 
+            $url = addQueryStringParameter($url, 'status', 'fail');
+            header("Location: {$url}");
         }
     } else {
-        header("Location: {$global['webSiteRootURL']}plugin/Subscription/showPlans.php?status=fail");
+        $url = Subscription::getBuyURL(); 
+        $url = addQueryStringParameter($url, 'status', 'fail');
+        header("Location: {$url}");
     }
 } else {
 

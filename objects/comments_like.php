@@ -1,17 +1,23 @@
 <?php
 global $global, $config;
-if(!isset($global['systemRootPath'])){
+
+if (!isset($global['systemRootPath'])) {
     require_once '../videos/configuration.php';
 }
-require_once $global['systemRootPath'].'objects/user.php';
-class CommentsLike {
+
+require_once $global['systemRootPath'] . 'objects/user.php';
+
+class CommentsLike
+{
+    protected $properties = [];
     private $id;
     private $like;
     private $comments_id;
     private $users_id;
 
-    function __construct($like, $comments_id) {
-        if(!User::isLogged()){
+    public function __construct($like, $comments_id)
+    {
+        if (!User::isLogged()) {
             header('Content-Type: application/json');
             die('{"error":"'.__("Permission denied").'"}');
         }
@@ -26,58 +32,64 @@ class CommentsLike {
         $this->save();
     }
 
-    private function setLike($like) {
+    private function setLike($like)
+    {
         $like = intval($like);
-        if(!in_array($like, array(0,1,-1))){
+        if (!in_array($like, [0,1,-1])) {
             $like = 0;
         }
         $this->like = $like;
     }
 
-    private function load() {
+    public function load()
+    {
         $like = $this->getLike();
         if (empty($like)) {
             return false;
         }
         foreach ($like as $key => $value) {
-            $this->$key = $value;
+            @$this->$key = $value;
+            //$this->properties[$key] = $value;
         }
     }
 
-    private function getLike() {
+    private function getLike()
+    {
         global $global;
         if (empty($this->users_id) || empty($this->comments_id)) {
             header('Content-Type: application/json');
             die('{"error":"You must have user and videos set to get a like"}');
         }
         $sql = "SELECT * FROM comments_likes WHERE users_id = ? AND comments_id = ? LIMIT 1";
-        $res = sqlDAL::readSql($sql,"ii",array($this->users_id,$this->comments_id));
+        $res = sqlDAL::readSql($sql, "ii", [$this->users_id,$this->comments_id]);
         $result = sqlDAL::fetchAssoc($res);
         sqlDAL::close($res);
         return ($res) ? $result : false;
     }
 
-    private function save() {
+    private function save()
+    {
         global $global;
-        if(!User::isLogged()){
+        if (!User::isLogged()) {
             header('Content-Type: application/json');
             die('{"error":"'.__("Permission denied").'"}');
         }
-        $formats = "";
-        $values = array();
+        $formats = '';
+        $values = [];
         if (!empty($this->id)) {
             $sql = "UPDATE comments_likes SET `like` = ?, modified = now() WHERE id = ?";
             $formats = "ii";
-            $values = array($this->like,$this->id);
+            $values = [$this->like,$this->id];
         } else {
             $sql = "INSERT INTO comments_likes ( `like`,users_id, comments_id, created, modified) VALUES (?, ?, ?, now(), now())";
             $formats = "iii";
-            $values = array($this->like,$this->users_id,$this->comments_id);
+            $values = [$this->like,$this->users_id,$this->comments_id];
         }
-        return sqlDAL::writeSql($sql,$formats,$values);
+        return sqlDAL::writeSql($sql, $formats, $values);
     }
 
-    static function getLikes($comments_id) {
+    public static function getLikes($comments_id)
+    {
         global $global;
 
         $obj = new stdClass();
@@ -87,26 +99,27 @@ class CommentsLike {
         $obj->myVote = self::getMyVote($comments_id);
 
         $sql = "SELECT count(*) as total FROM comments_likes WHERE comments_id = ? AND `like` = 1 "; // like
-        $res = sqlDAL::readSql($sql,"i",array($comments_id));
+        $res = sqlDAL::readSql($sql, "i", [$comments_id]);
         $result = sqlDAL::fetchAssoc($res);
         sqlDAL::close($res);
         if (!$res) {
-            die($sql . '\nError : (' . $global['mysqli']->errno . ') ' . $global['mysqli']->error);
+            return false;
         }
         $obj->likes = intval($result['total']);
 
         $sql = "SELECT count(*) as total FROM comments_likes WHERE comments_id = ? AND `like` = -1 "; // dislike
-        $res = sqlDAL::readSql($sql,"i",array($comments_id));
+        $res = sqlDAL::readSql($sql, "i", [$comments_id]);
         $result = sqlDAL::fetchAssoc($res);
         sqlDAL::close($res);
         if (!$res) {
-            die($sql.'\nError : (' . $global['mysqli']->errno . ') ' . $global['mysqli']->error);
+            return false;
         }
         $obj->dislikes = intval($result['total']);
         return $obj;
     }
-    
-    static function getTotalLikes() {
+
+    public static function getTotalLikes()
+    {
         global $global;
 
         $obj = new stdClass();
@@ -118,7 +131,7 @@ class CommentsLike {
         $result = sqlDAL::fetchAssoc($res);
         sqlDAL::close($res);
         if (!$res) {
-            die($sql . '\nError : (' . $global['mysqli']->errno . ') ' . $global['mysqli']->error);
+            return false;
         }
         $obj->likes = intval($result['total']);
 
@@ -127,20 +140,21 @@ class CommentsLike {
         $result = sqlDAL::fetchAssoc($res);
         sqlDAL::close($res);
         if (!$res) {
-            die($sql.'\nError : (' . $global['mysqli']->errno . ') ' . $global['mysqli']->error);
+            return false;
         }
         $obj->dislikes = intval($result['total']);
         return $obj;
     }
 
-    static function getMyVote($comments_id) {
+    public static function getMyVote($comments_id)
+    {
         global $global;
         if (!User::isLogged()) {
             return 0;
         }
         $id = User::getId();
         $sql = "SELECT `like` FROM comments_likes WHERE comments_id = ? AND users_id = ? "; // like
-        $res = sqlDAL::readSql($sql,"ii",array($comments_id,$id));
+        $res = sqlDAL::readSql($sql, "ii", [$comments_id,$id]);
         $result = sqlDAL::fetchAssoc($res);
         sqlDAL::close($res);
         if (!empty($result)) {
@@ -148,5 +162,4 @@ class CommentsLike {
         }
         return 0;
     }
-
 }

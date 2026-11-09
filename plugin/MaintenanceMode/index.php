@@ -1,21 +1,35 @@
+<?php
+require_once dirname(__FILE__) . '/../../videos/configuration.php';
+
+if(empty($obj)){
+    $obj = AVideoPlugin::getDataObject('MaintenanceMode');
+}
+if(!empty($obj->redirectHere) && isValidURL($obj->redirectHere)){
+    header("Location: {$obj->redirectHere}", true, 302);
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
     <head>
         <title>Coming Soon 1</title>
         <meta charset="UTF-8">
+        <meta name="robots" content="noindex, nofollow">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <!--===============================================================================================-->
-        <link href="<?php echo $global['webSiteRootURL']; ?>view/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css"/>
+            <?php
+            include $global['systemRootPath'] . 'view/include/bootstrap.css.php';
+            ?>
         <!--===============================================================================================-->
-        <link href="<?php echo $global['webSiteRootURL']; ?>view/css/fontawesome-free-5.5.0-web/css/all.min.css" rel="stylesheet" type="text/css"/>
+        <link href="<?php echo getURL('node_modules/@fortawesome/fontawesome-free/css/all.min.css'); ?>" rel="stylesheet" type="text/css"/>
 
         <!--===============================================================================================-->
-        <link rel="stylesheet" type="text/css" href="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/vendor/animate/animate.css">
+        <link rel="stylesheet" type="text/css" href="<?php echo getCDN(); ?>plugin/MaintenanceMode/vendor/animate/animate.css">
         <!--===============================================================================================-->
-        <link rel="stylesheet" type="text/css" href="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceModevendor/select2/select2.min.css">
+        <link rel="stylesheet" type="text/css" href="<?php echo getCDN(); ?>plugin/MaintenanceMode/vendor/select2/select2.min.css">
         <!--===============================================================================================-->
-        <link rel="stylesheet" type="text/css" href="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/css/util.css">
-        <link rel="stylesheet" type="text/css" href="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/css/main.css">
+        <link rel="stylesheet" type="text/css" href="<?php echo getCDN(); ?>plugin/MaintenanceMode/css/util.css">
+        <link rel="stylesheet" type="text/css" href="<?php echo getCDN(); ?>plugin/MaintenanceMode/css/main.css">
         <!--===============================================================================================-->
     </head>
     <body>
@@ -56,7 +70,7 @@
             <!-- Form -->
             <div class="size3 flex-col-sb flex-w p-l-75 p-r-75 p-t-45 p-b-45 respon1">
                 <div class="wrap-pic1">
-                    <img src="<?php echo $global['webSiteRootURL']; ?><?php echo $config->getLogo(); ?>" alt="LOGO">
+                    <img src="<?php echo getCDN(); ?><?php echo $config->getLogo(); ?>" alt="LOGO">
                 </div>
 
                 <div class="p-t-50 p-b-60">
@@ -81,7 +95,7 @@
                     if (!empty($obj->twitterLink)) {
                         ?>
                         <a href="<?php echo $obj->twitterLink; ?>" class="flex-c-m size5 bg4 how1 trans-04 m-r-5">
-                            <i class="fab fa-twitter"></i>
+                            <i class="fa-brands fa-x-twitter"></i>
                         </a>
                         <?php
                     }
@@ -112,18 +126,20 @@
             </div>
         </div>
 
-        <!--===============================================================================================-->	
-        <script src="<?php echo $global['webSiteRootURL']; ?>view/js/jquery-3.3.1.min.js" type="text/javascript"></script>
         <!--===============================================================================================-->
-        <script src="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/vendor/bootstrap/js/popper.js"></script>
-        <script src="<?php echo $global['webSiteRootURL']; ?>view/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
+        <script src="<?php echo getURL('node_modules/jquery/dist/jquery.min.js'); ?>" type="text/javascript"></script>
+        <!--===============================================================================================
+        <script src="<?php echo getCDN(); ?>plugin/MaintenanceMode/vendor/bootstrap/js/popper.js"></script>-->
+        <?php
+        include $global['systemRootPath'] . 'view/include/bootstrap.js.php';
+        ?>
         <!--===============================================================================================-->
-        <script src="vendor/select2/select2.min.js"></script>
+        <script src="<?php echo getURL('view/js/select2/select2.min.js'); ?>"></script>
         <!--===============================================================================================-->
-        <script src="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/vendor/countdowntime/moment.min.js"></script>
-        <script src="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/vendor/countdowntime/moment-timezone.min.js"></script>
-        <script src="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/vendor/countdowntime/moment-timezone-with-data.min.js"></script>
-        <script src="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/vendor/countdowntime/countdowntime.js"></script>
+        <?php
+        include $global['systemRootPath'] . 'view/include/moment.js.php';
+        ?>
+        <script src="<?php echo getURL('plugin/MaintenanceMode/vendor/countdowntime/countdowntime.js'); ?>"></script>
         <?php
         if (empty($obj->hideClock) && !empty($obj->endIn)) {
             ?>
@@ -143,7 +159,7 @@
                 });
             </script>
             <!--===============================================================================================-->
-            <script src="<?php echo $global['webSiteRootURL']; ?>plugin/MaintenanceMode/vendor/tilt/tilt.jquery.min.js"></script>
+            <script src="<?php echo getCDN(); ?>plugin/MaintenanceMode/vendor/tilt/tilt.jquery.min.js"></script>
             <script >
                 $('.js-tilt').tilt({
                     scale: 1.2

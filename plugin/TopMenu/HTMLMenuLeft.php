@@ -5,50 +5,45 @@ require_once $configFile;
 require_once $global['systemRootPath'] . 'plugin/TopMenu/Objects/Menu.php';
 require_once $global['systemRootPath'] . 'plugin/TopMenu/Objects/MenuItem.php';
 
-$menu = Menu::getAllActive(2);
+$menu = Menu::getAllActive(Menu::$typeLeftMenu);
 ?>
+<!-- left menu start -->
 <?php
 foreach ($menu as $key => $value) {
     ?>
     <li>
         <hr>
-        <h3 class="text-danger">
+        <strong class="text-danger hideIfCompressed">
             <?php
             if (!empty($value['icon'])) {
                 ?>
-                <i class="<?php echo $value['icon'] ?>"></i> 
+                <i class="<?php echo htmlspecialchars($value['icon'], ENT_QUOTES, 'UTF-8') ?>"></i>
                 <?php
             }
             ?>
-            <?php echo $value['menuName']; ?>
-        </h3>
+            <?php echo htmlspecialchars(__($value['menuName']), ENT_QUOTES, 'UTF-8'); ?>
+        </strong>
     </li>
     <?php
     $menuItems = MenuItem::getAllFromMenu($value['id'], true);
     foreach ($menuItems as $key2 => $value2) {
-        $url = $value2['url'];
-        if (empty($url) || strpos($url, 'iframe:') !== false) {
-            if (!empty($value2['menuSeoUrlItem'])) {
-                $url = $global['webSiteRootURL'] . "menu/{$value2['menuSeoUrlItem']}";
-            } else {
-                $url = $global['webSiteRootURL'] . "plugin/TopMenu/?id={$value2['id']}";
-            }
-        }
         ?>
         <li>
-            <a  href="<?php echo $url; ?>" >
+            <a  href="<?php echo htmlspecialchars($value2['finalURL'], ENT_QUOTES, 'UTF-8'); ?>" <?php echo $value2['target']; ?> >
                 <?php
                 if (!empty($value2['icon'])) {
                     ?>
-                    <i class="<?php echo $value2['icon'] ?>"></i> 
+                    <i class="<?php echo htmlspecialchars($value2['icon'], ENT_QUOTES, 'UTF-8') ?>"></i>
                     <?php
                 }
                 ?>
-                <?php echo $value2['title'] ?>
+                <span class="menuLabel">
+                    <?php echo htmlspecialchars(__($value2['title']), ENT_QUOTES, 'UTF-8'); ?>
+                </span>
             </a>
-        </li>            
+        </li>
         <?php
     }
 }
 ?>
-                
+<!-- left menu end -->

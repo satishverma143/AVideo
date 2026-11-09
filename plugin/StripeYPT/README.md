@@ -1,242 +1,96 @@
-# Stripe PHP bindings
+# StripeYPT configuration
 
-[![Build Status](https://travis-ci.org/stripe/stripe-php.svg?branch=master)](https://travis-ci.org/stripe/stripe-php)
-[![Latest Stable Version](https://poser.pugx.org/stripe/stripe-php/v/stable.svg)](https://packagist.org/packages/stripe/stripe-php)
-[![Total Downloads](https://poser.pugx.org/stripe/stripe-php/downloads.svg)](https://packagist.org/packages/stripe/stripe-php)
-[![License](https://poser.pugx.org/stripe/stripe-php/license.svg)](https://packagist.org/packages/stripe/stripe-php)
-[![Code Coverage](https://coveralls.io/repos/stripe/stripe-php/badge.svg?branch=master)](https://coveralls.io/r/stripe/stripe-php?branch=master)
+StripeYPT handles card payments for YPTWallet, PayPerView movie rentals, PayPerViewLive events and recurring Subscription plans. Enable YPTWallet and its `enablePlugin_YPTWalletStripe` option. Enable each content plugin you intend to use. Independently distributed plugins need compatible checkout versions; an approved card payment alone does not establish access to a movie or live event.
 
-You can sign up for a Stripe account at https://stripe.com.
+## Configure in AVideo
 
-## Requirements
+1. Select the correct Stripe account and sandbox. Copy its publishable key and create a restricted server key with the permissions below. Do not post keys in issues or commit them.
+2. In **Admin Panel → Plugins → StripeYPT → Edit parameters**, save `Publishablekey` and `Restrictedkey`. Defaults are blank. There is no separate sandbox switch: `pk_test_` with `rk_test_` (or `sk_test_`) uses test mode; live keys use real payments. Prefixes must match, and both keys must belong to the same Stripe account.
+3. Open **Check configuration → Run checks**. Review every failure and every item marked for further verification.
+4. Click **Configure webhook automatically** if needed. With **Webhook Endpoints: Read + Write**, the tool creates the site's endpoint with the two required events and a pinned API version, then saves its new signing secret encrypted on the server. It never returns that secret to the browser. If one exact matching endpoint already exists, it enables it and adds missing events, preserving other events and existing secrets. A correct existing endpoint needs no write operation.
+5. If an endpoint already exists, its secret cannot be recovered with the v1 API. Reveal its secret in Stripe and paste it into `SigningSecret`. Automatic setup does not overwrite this field. If creation succeeded but saving failed, use this same manual recovery before accepting payments.
+6. Complete the sandbox tests below. API checks do not replace a signed webhook delivery or an actual checkout/playback test.
+7. To go live, repeat setup with the live account's keys and webhook secret. Keep test and live credentials separate.
 
-PHP 5.4.0 and later.
+Automatic configuration is an explicit administrator **POST** protected by `globalToken`. It is serialized across PHP workers and uses Stripe idempotency for creation. Ordinary payments and IPNs no longer list or create webhook endpoints. The legacy `createWebhook.json.php` URL remains an alias for the secured checker: POST with a valid token and `action=check` (default) or `action=configure`. Its `webhook` field contains only safe endpoint details.
 
-## Composer
+| Setting | Purpose |
+| --- | --- |
+| `Publishablekey` | Browser key, `pk_test_…` or `pk_live_…` |
+| `Restrictedkey` | Private server key, preferably `rk_test_…` or `rk_live_…`. Full `sk_` keys are supported but grant more access. |
+| `SigningSecret` | Manually configured webhook secret, `whsec_…`. Comma-separated secrets are supported during rotation. |
+| `automaticWebhookSecret` | Internal encrypted secret and binding saved by automatic creation. Valid only for the same server key and webhook URL; changing either requires configuration review. Keep the installation's encryption configuration when restoring backups. |
+| `paymentButtonLabel` | One-time payment button text |
+| `subscriptionButtonLabel` | Recurring subscription button text |
 
-You can install the bindings via [Composer](http://getcomposer.org/). Run the following command:
+## Required webhook
 
-```bash
-composer require stripe/stripe-php
-```
+| Property | Required value |
+| --- | --- |
+| URL | The installation's public HTTPS base URL + `plugin/StripeYPT/ipn.php` (including any installation subdirectory) |
+| Account | Your own account, in the same sandbox/live mode as the API keys |
+| Payload | **Snapshot**, not thin events |
+| API version | **2022-11-15**, matching StripeYPT's API requests |
+| Events | `charge.succeeded`, `invoice.payment_succeeded` |
+| Status | Enabled |
 
-To use the bindings, use Composer's [autoload](https://getcomposer.org/doc/01-basic-usage.md#autoloading):
+The tool paginates endpoints and matches the exact URL. It will not choose between duplicates, replace an endpoint with a different API version, delete unrelated endpoints, rotate secrets or change API key permissions. Version changes and duplicate cleanup need review in Stripe. An endpoint with `api_version=null` follows the account default and is not pinned.
 
-```php
-require_once('vendor/autoload.php');
-```
+Your domain, TLS, reverse proxy and forwarded ports must allow **Stripe's external servers** to POST to this URL. A successful local HTTP request or a well-formed HTTPS URL does not establish external reachability. Stripe CLI forwarding has a different signing secret from a Dashboard endpoint; use the secret of the delivery source you are actually testing.
 
-## Manual Installation
+## Restricted key permissions
 
-If you do not wish to use Composer, you can download the [latest release](https://github.com/stripe/stripe-php/releases). Then, to use the bindings, include the `init.php` file.
+Write permission includes read access. Stripe Dashboard labels can vary; check the resource corresponding to each API below.
 
-```php
-require_once('/path/to/stripe-php/init.php');
-```
+| Feature | Stripe resource | Required access | Reason |
+| --- | --- | --- | --- |
+| Wallet, PPV and PPV Live card checkout | PaymentIntents | Write | Create/read card payment intents |
+| All payment flows | Charges | Read | Read actual charge timing, refunded amount and invoice reference; verify safe fulfillment |
+| Configuration checker | Webhook Endpoints | Read | Inspect endpoint URL, mode, status, events and API version |
+| Automatic webhook setup | Webhook Endpoints | Write | Create or enable/update the site's endpoint; unnecessary at payment runtime if configured manually |
+| Recurring subscriptions / saved cards | Customers | Write | Create/retrieve customers and update their payment method |
+| Recurring subscriptions / saved cards | PaymentMethods | Write | Retrieve saved payment methods and related card operations |
+| Recurring subscriptions | Plans / Prices | Write | Create the recurring plan through the Plans API |
+| Recurring subscriptions | Products | Write | Plan creation includes creation of its product |
+| Recurring subscriptions | Subscriptions | Write | Create, retrieve, update and cancel recurring subscriptions |
+| Recurring subscriptions | Invoices | Read | Recover subscription metadata from a charge's invoice when needed |
 
-## Dependencies
+The checker probes **read access**, using requests with a limit of one, for the resources needed by enabled features. It reports missing access without returning customer/payment records or raw API error messages. It does **not** discover or grant a restricted key's permission list, and a successful GET does **not** prove Write access. Review required Write permissions in Stripe and exercise them in sandbox checkout. Webhook Write is proved only when an actual requested setup change succeeds; an unchanged endpoint does not prove it.
 
-The bindings require the following extensions in order to work properly:
+An optional current-account probe reports the account ID and `charges_enabled`. A false value blocks live readiness; in a sandbox it is reported for review, with a request to verify test payments separately. Sandbox success does not prove live activation. If a restricted key cannot read this resource, the report asks for a Dashboard check and continues the payment resource probes. Account read access is optional for this additional diagnostic, not a new checkout requirement. The tool does not submit onboarding information or change the account's capabilities.
 
-- [`curl`](https://secure.php.net/manual/en/book.curl.php), although you can use your own non-cURL client if you prefer
-- [`json`](https://secure.php.net/manual/en/book.json.php)
-- [`mbstring`](https://secure.php.net/manual/en/book.mbstring.php) (Multibyte String)
+Keys can also be limited by IP, account, expiration or Stripe policy. A denied request can require checking those settings as well as the resource permission. The tool uses only StripeYPT's keys; independent integrations with their own Stripe settings (for example DiskUploadQuota) require separate review.
 
-If you use Composer, these dependencies should be handled automatically. If you install manually, you'll want to make sure that these extensions are available.
+## Payment and access flow
 
-## Getting Started
+The browser confirms the card, including bank authentication when requested. The server fulfills only after a signed Stripe webhook is processed and the local transaction commits. Card approval, wallet credit and content access are separate observations.
 
-Simple usage looks like:
+- **Wallet:** `charge.succeeded` credits the wallet once.
+- **PPV:** with compatible PayPerView checkout, verified card credit and the selected movie rental are completed together. A failed rental can leave the credit available in the wallet for completing the rental. Check the exact video ID/title and access expiration.
+- **PPV Live:** check the exact event schedule. A future event has a purchase confirmation and start time; playback is available when the broadcast starts.
+- **Subscription:** `invoice.payment_succeeded` fulfills the recurring payment and renews access once. A related charge event must not renew it again. A first invoice of zero (such as a trial) can still be relevant.
 
-```php
-\Stripe\Stripe::setApiKey('sk_test_BQokikJOvBiI2HlWgH4olfQ2');
-$charge = \Stripe\Charge::create(['amount' => 2000, 'currency' => 'usd', 'source' => 'tok_189fqt2eZvKYlo2CTGBeg6Uq']);
-echo $charge;
-```
+If a customer was charged but sees no rental/subscription, inspect Stripe deliveries and AVideo logs before retrying. Do not charge the customer again while an earlier paid payment is waiting for fulfillment. Repair/retry the existing delivery and confirm the exact purchase and wallet state.
 
-## Documentation
+## Sandbox acceptance checks
 
-Please see https://stripe.com/docs/api for up-to-date documentation.
+Use [Stripe's current test cards](https://docs.stripe.com/testing), never real cards in sandbox.
 
-## Legacy Version Support
+1. Approve a payment with `4242 4242 4242 4242`, a future expiry, any valid CVC and postal code. Confirm the amount, currency and movie/event or plan description in Stripe and the receipt.
+2. Confirm a signed delivery to the exact endpoint returned **HTTP 200**. Confirm the matching wallet credit and rental or subscription, then open and play the selected video. For future live events, verify the scheduled confirmation and test playback during a broadcast.
+3. Redeliver the same event: it must not credit, rent or renew twice.
+4. Test a declined card (`4000 0000 0000 0002`): show an actionable error, with no wallet credit or access.
+5. Test 3D Secure with a current Stripe authentication test card (for example `4000 0025 0000 3155`). Complete and cancel authentication. A blank bank frame or an intent still in `requires_action` is **not** a passing result, even if another card works.
+6. Check refresh/double-click/pending-webhook behavior, partial wallet balance, an already-owned purchase and the correct post-payment confirmation/redirect. Keep one charge and one entitlement per purchase.
 
-### PHP 5.3
+## Troubleshooting
 
-If you are using PHP 5.3, you can download v5.9.2 ([zip](https://github.com/stripe/stripe-php/archive/v5.9.2.zip), [tar.gz](https://github.com/stripe/stripe-php/archive/v5.9.2.tar.gz)) from our [releases page](https://github.com/stripe/stripe-php/releases). This version will continue to work with new versions of the Stripe API for all common uses.
+**Card charged, access missing:** check the correct account/mode, exact content metadata, signed delivery and AVideo processing logs. HTTP 200 means the handler acknowledged an event; confirm the resulting purchase too.
 
-### PHP 5.2
+**Five-minute duplicate guard:** the guard can intentionally delay a different new one-time payment after a recent successful payment. **Charges: Read** gives the actual Stripe charge timestamp and refund state; granting it does not remove the guard. A paid but uncredited intent can block a new charge for Stripe's retry window (up to three days). Finish or investigate that payment instead of creating another charge.
 
-If you are using PHP 5.2, you can download v1.18.0 ([zip](https://github.com/stripe/stripe-php/archive/v1.18.0.zip), [tar.gz](https://github.com/stripe/stripe-php/archive/v1.18.0.tar.gz)) from our [releases page](https://github.com/stripe/stripe-php/releases). This version will continue to work with new versions of the Stripe API for all common uses.
+**Signing secret check says review needed:** presence and format do not prove the secret belongs to the endpoint. After this version receives and successfully handles a real signed payment event, it caches the event type and reception time for up to seven days. The report shows that historical evidence for the current server key, URL and secret set. A settings change or cache cleanup requires a fresh delivery. This evidence does not prove current reachability or content access; confirm the delivery and resulting purchase in Stripe/AVideo. The tool never signs its own probe and presents it as evidence that Stripe delivery works.
 
-This legacy version may be included via `require_once("/path/to/stripe-php/lib/Stripe.php");`, and used like:
+**No webhook inspection permission:** configure it manually in Stripe using the table above. The checkout does not require webhook-management access. Add Read only if you want the tool to inspect it, and Write only if you want automatic configuration.
 
-```php
-Stripe::setApiKey('d8e8fca2dc0f896fd7cb4cb0031ba249');
-$charge = Stripe_Charge::create(array('source' => 'tok_XXXXXXXX', 'amount' => 2000, 'currency' => 'usd'));
-echo $charge;
-```
-
-## Custom Request Timeouts
-
-*NOTE:* We do not recommend decreasing the timeout for non-read-only calls (e.g. charge creation), since even if you locally timeout, the request on Stripe's side can still complete. If you are decreasing timeouts on these calls, make sure to use [idempotency tokens](https://stripe.com/docs/api/php#idempotent_requests) to avoid executing the same transaction twice as a result of timeout retry logic.
-
-To modify request timeouts (connect or total, in seconds) you'll need to tell the API client to use a CurlClient other than its default. You'll set the timeouts in that CurlClient.
-
-```php
-// set up your tweaked Curl client
-$curl = new \Stripe\HttpClient\CurlClient();
-$curl->setTimeout(10); // default is \Stripe\HttpClient\CurlClient::DEFAULT_TIMEOUT
-$curl->setConnectTimeout(5); // default is \Stripe\HttpClient\CurlClient::DEFAULT_CONNECT_TIMEOUT
-
-echo $curl->getTimeout(); // 10
-echo $curl->getConnectTimeout(); // 5
-
-// tell Stripe to use the tweaked client
-\Stripe\ApiRequestor::setHttpClient($curl);
-
-// use the Stripe API client as you normally would
-```
-
-## Custom cURL Options (e.g. proxies)
-
-Need to set a proxy for your requests? Pass in the requisite `CURLOPT_*` array to the CurlClient constructor, using the same syntax as `curl_stopt_array()`. This will set the default cURL options for each HTTP request made by the SDK, though many more common options (e.g. timeouts; see above on how to set those) will be overridden by the client even if set here.
-
-```php
-// set up your tweaked Curl client
-$curl = new \Stripe\HttpClient\CurlClient([CURLOPT_PROXY => 'proxy.local:80']);
-// tell Stripe to use the tweaked client
-\Stripe\ApiRequestor::setHttpClient($curl);
-```
-
-Alternately, a callable can be passed to the CurlClient constructor that returns the above array based on request inputs. See `testDefaultOptions()` in `tests/CurlClientTest.php` for an example of this behavior. Note that the callable is called at the beginning of every API request, before the request is sent.
-
-### Configuring a Logger
-
-The library does minimal logging, but it can be configured
-with a [`PSR-3` compatible logger][psr3] so that messages
-end up there instead of `error_log`:
-
-```php
-\Stripe\Stripe::setLogger($logger);
-```
-
-### Accessing response data
-
-You can access the data from the last API response on any object via `getLastResponse()`.
-
-```php
-$charge = \Stripe\Charge::create(['amount' => 2000, 'currency' => 'usd', 'source' => 'tok_visa']);
-echo $charge->getLastResponse()->headers['Request-Id'];
-```
-
-### SSL / TLS compatibility issues
-
-Stripe's API now requires that [all connections use TLS 1.2](https://stripe.com/blog/upgrading-tls). Some systems (most notably some older CentOS and RHEL versions) are capable of using TLS 1.2 but will use TLS 1.0 or 1.1 by default. In this case, you'd get an `invalid_request_error` with the following error message: "Stripe no longer supports API requests made with TLS 1.0. Please initiate HTTPS connections with TLS 1.2 or later. You can learn more about this at [https://stripe.com/blog/upgrading-tls](https://stripe.com/blog/upgrading-tls).".
-
-The recommended course of action is to [upgrade your cURL and OpenSSL packages](https://support.stripe.com/questions/how-do-i-upgrade-my-stripe-integration-from-tls-1-0-to-tls-1-2#php) so that TLS 1.2 is used by default, but if that is not possible, you might be able to solve the issue by setting the `CURLOPT_SSLVERSION` option to either `CURL_SSLVERSION_TLSv1` or `CURL_SSLVERSION_TLSv1_2`:
-
-```php
-$curl = new \Stripe\HttpClient\CurlClient([CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1]);
-\Stripe\ApiRequestor::setHttpClient($curl);
-```
-
-### Per-request Configuration
-
-For apps that need to use multiple keys during the lifetime of a process, like
-one that uses [Stripe Connect][connect], it's also possible to set a
-per-request key and/or account:
-
-```php
-\Stripe\Charge::all([], [
-    'api_key' => 'sk_test_...',
-    'stripe_account' => 'acct_...'
-]);
-
-\Stripe\Charge::retrieve("ch_18atAXCdGbJFKhCuBAa4532Z", [
-    'api_key' => 'sk_test_...',
-    'stripe_account' => 'acct_...'
-]);
-```
-
-### Configuring CA Bundles
-
-By default, the library will use its own internal bundle of known CA
-certificates, but it's possible to configure your own:
-
-```php
-\Stripe\Stripe::setCABundlePath("path/to/ca/bundle");
-```
-
-### Configuring Automatic Retries
-
-The library can be configured to automatically retry requests that fail due to
-an intermittent network problem:
-
-```php
-\Stripe\Stripe::setMaxNetworkRetries(2);
-```
-
-[Idempotency keys][idempotency-keys] are added to requests to guarantee that
-retries are safe.
-
-## Development
-
-Get [Composer][composer]. For example, on Mac OS:
-
-```bash
-brew install composer
-```
-
-Install dependencies:
-
-```bash
-composer install
-```
-
-The test suite depends on [stripe-mock], so make sure to fetch and run it from a
-background terminal ([stripe-mock's README][stripe-mock] also contains
-instructions for installing via Homebrew and other methods):
-
-```bash
-go get -u github.com/stripe/stripe-mock
-stripe-mock
-```
-
-Install dependencies as mentioned above (which will resolve [PHPUnit](http://packagist.org/packages/phpunit/phpunit)), then you can run the test suite:
-
-```bash
-./vendor/bin/phpunit
-```
-
-Or to run an individual test file:
-
-```bash
-./vendor/bin/phpunit tests/UtilTest.php
-```
-
-Update bundled CA certificates from the [Mozilla cURL release][curl]:
-
-```bash
-./update_certs.php
-```
-
-## Attention plugin developers
-
-Are you writing a plugin that integrates Stripe and embeds our library? Then please use the `setAppInfo` function to identify your plugin. For example:
-
-```php
-\Stripe\Stripe::setAppInfo("MyAwesomePlugin", "1.2.34", "https://myawesomeplugin.info");
-```
-
-The method should be called once, before any request is sent to the API. The second and third parameters are optional.
-
-### SSL / TLS configuration option
-
-See the "SSL / TLS compatibility issues" paragraph above for full context. If you want to ensure that your plugin can be used on all systems, you should add a configuration option to let your users choose between different values for `CURLOPT_SSLVERSION`: none (default), `CURL_SSLVERSION_TLSv1` and `CURL_SSLVERSION_TLSv1_2`.
-
-[composer]: https://getcomposer.org/
-[connect]: https://stripe.com/connect
-[curl]: http://curl.haxx.se/docs/caextract.html
-[psr3]: http://www.php-fig.org/psr/psr-3/
-[idempotency-keys]: https://stripe.com/docs/api/php#idempotent_requests
-[stripe-mock]: https://github.com/stripe/stripe-mock
+References: [restricted API keys](https://docs.stripe.com/keys/restricted-api-keys), [create webhook endpoint](https://docs.stripe.com/api/webhook_endpoints/create), [update webhook endpoint](https://docs.stripe.com/api/webhook_endpoints/update), [receiving webhooks](https://docs.stripe.com/webhooks).

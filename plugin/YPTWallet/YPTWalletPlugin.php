@@ -13,26 +13,26 @@
 abstract class YPTWalletPlugin {
     //put your code here
     private $invoiceNumber, $value, $currency;
-    
-    abstract function getAprovalButton();    
+
+    abstract function getAprovalButton();
     abstract function getEmptyDataObject();
-    
+
     function getValue(){
         return $this->value;
     }
-    
+
     function setValue($value){
         $this->value = floatval($value);
     }
-    
+
     function getInvoiceNumber() {
         return $this->invoiceNumber;
     }
 
     function setInvoiceNumber($invoiceNumber) {
         $this->invoiceNumber = $invoiceNumber;
-    }    
-    
+    }
+
     function getCurrency() {
         return $this->currency;
     }
@@ -41,7 +41,10 @@ abstract class YPTWalletPlugin {
         $this->currency = $currency;
     }
 
-    public function getRecurrentAprovalButton() {
+    public function getRecurrentAprovalButton($plans_id) {
     }
-    
+
+    public function getRecurrentAprovalButtonV2($total = '1.00', $currency = "USD", $frequency = "Month", $interval = 1, $name = '', $json = '', $trialDays = 0) {
+    }
+
 }

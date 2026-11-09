@@ -1,94 +1,154 @@
 <?php
-class BootGrid {
+class BootGrid
+{
+    private const SEARCH_CHARSET = 'utf8mb4';
+    private const SEARCH_COLLATION = 'utf8mb4_unicode_ci';
 
-    static function getSqlFromPost($searchFieldsNames = array(), $keyPrefix = "", $alternativeOrderBy = "", $doNotSearch=false) {
-        if(empty($doNotSearch)){
-            $sql = self::getSqlSearchFromPost($searchFieldsNames);
-        }else{
-            $sql = "";
-        }
-        
-        if(empty($_POST['sort']) && !empty($_GET['order'][0]['dir'])){
+    public static function populateSortFromDataTablesOrder()
+    {
+        if (empty($_POST['sort']) && !empty($_GET['order'][0]['dir'])) {
             $index = intval($_GET['order'][0]['column']);
-            $_GET['columns'][$index]['data'];
-            $_POST['sort'][$_GET['columns'][$index]['data']] = $_GET['order'][0]['dir'];
+            $data = $_GET['columns'][$index]['data'] ?? '';
+            if ($data !== '') {
+                $_POST['sort'][$data] = $_GET['order'][0]['dir'];
+            }
         }
-        
-        if (!empty($_POST['sort'])) {
-            $orderBy = array();
+    }
+
+    public static function getSqlFromPost($searchFieldsNames = [], $keyPrefix = "", $alternativeOrderBy = "", $doNotSearch=false, $FIND_IN_SET = "", $allowedSortColumns = [])
+    {
+        global $global;
+        if (empty($doNotSearch) && empty($global['doNotSearch']) ) {
+            $sql = self::getSqlSearchFromPost($searchFieldsNames);
+        } else {
+            $sql = '';
+        }
+
+        self::populateSortFromDataTablesOrder();
+
+
+        if (!empty($FIND_IN_SET)) {
+            $sql .= " ORDER BY FIND_IN_SET({$FIND_IN_SET}) DESC ";
+        } elseif (!empty($_POST['sort'])) {
+            $orderBy = [];
             foreach ($_POST['sort'] as $key => $value) {
                 $direction = "ASC";
-                if(strtoupper($value)==="DESC"){
+                if (strtoupper($value)==="DESC") {
                     $direction = "DESC";
+                }else
+                if (strtoupper($value)==="IS NULL") {
+                    $direction = "IS NULL";
+                }else if (strtoupper($value)==="IS NOT NULL DESC") {
+                    $direction = "IS NOT NULL DESC";
                 }
                 $key = preg_replace("/[^A-Za-z0-9._ ]/", '', $key);
-                if($key=='order'){
+                if ($key=='order') {
                     $key = '`order`';
                 }
-                $orderBy[] = " {$keyPrefix}{$key} {$direction} ";
+                // charset filter above only blocks syntax injection, not naming an unrelated/sensitive column; callers that pass $allowedSortColumns rely on this to cap it to their own known-safe fields
+                if (!empty($allowedSortColumns) && !in_array($key, $allowedSortColumns, true)) {
+                    continue;
+                }
+                if (strpos($key, $keyPrefix) === 0) {
+                    $orderBy[] = " {$key} {$direction} ";
+                } else {
+                    $orderBy[] = " {$keyPrefix}{$key} {$direction} ";
+                }
             }
-            $sql .= " ORDER BY ".implode(",", $orderBy);
+            if (!empty($orderBy)) {
+                $sql .= " ORDER BY ".implode(",", $orderBy);
+            } else {
+                $sql .= $alternativeOrderBy;
+            }
         } else {
             $sql .= $alternativeOrderBy;
         }
 
-        if (empty($_POST['rowCount']) && !empty($_GET['length'])) {
-            $_POST['rowCount'] = intval($_GET['length']);
-        }
+        $rowCount = getRowCount();
+        $current = getCurrentPage();
+        $currentP = ($current-1)*$rowCount;
+        $currentP = $currentP < 0 ? 0 : $currentP;
 
-        if (empty($_POST['current']) && !empty($_GET['start'])) {
-            $_POST['current'] = ($_GET['start'] / $_GET['length']) + 1;
-        } else if (empty($_POST['current']) && isset($_GET['start'])) {
-            $_POST['current'] = 1;
-        }
-
-        $_POST['current'] = intval(@$_POST['current']);
-        $_POST['rowCount'] = intval(@$_POST['rowCount']);
-        
-        if(!empty($_POST['rowCount']) && $_POST['rowCount']>0){
-            if(empty($_POST['current'])){
-                $_POST['current'] = 1;
-            }
-            $_POST['rowCount'] = intval($_POST['rowCount']);
-            $_POST['current'] = intval($_POST['current']);
-            $current = intval(($_POST['current']-1)*$_POST['rowCount']);
-            $current = $current<0?0:$current;
-            $sql .= " LIMIT $current, {$_POST['rowCount']} ";
-        }else{
-            $_POST['current'] = 0;
-            $_POST['rowCount'] = 0;
+        if ($rowCount>0) {
+            $sql .= " LIMIT $currentP, {$rowCount} ";
         }
         return $sql;
     }
 
-    static function getSqlSearchFromPost($searchFieldsNames = array(), $connection = "AND") {
-        $sql = "";
+    public static function getSearchPhraseFromPost()
+    {
         if (!empty($_GET['searchPhrase'])) {
             $_POST['searchPhrase'] = $_GET['searchPhrase'];
-        } else if (!empty($_GET['search']['value'])) {
+        } elseif (!empty($_GET['search']['value'])) {
             $_POST['searchPhrase'] = $_GET['search']['value'];
-        }else if (!empty($_GET['q'])) {
+        } elseif (!empty($_GET['q'])) {
             $_POST['searchPhrase'] = $_GET['q'];
         }
-        
-        if(!empty($_POST['searchPhrase'])){
-            global $global;
-            $search = $global['mysqli']->real_escape_string(xss_esc($_POST['searchPhrase']));
 
-            $like = array();
+        if (empty($_POST['searchPhrase'])) {
+            return '';
+        }
+
+        $search = mb_strtolower(xss_esc($_POST['searchPhrase']));
+        return str_replace('&quot;', '"', $search);
+    }
+
+    public static function escapeSearchPhraseForSQL($search)
+    {
+        global $global;
+        return $global['mysqli']->real_escape_string($search);
+    }
+
+    private static function getSearchFieldAsUtf8($field)
+    {
+        return "CAST({$field} AS CHAR CHARACTER SET " . self::SEARCH_CHARSET . ") COLLATE " . self::SEARCH_COLLATION;
+    }
+
+    private static function getBinarySearchFieldAsUtf8($field)
+    {
+        return "CONVERT(CAST({$field} as BINARY) USING " . self::SEARCH_CHARSET . ") COLLATE " . self::SEARCH_COLLATION;
+    }
+
+    private static function getSearchNeedle($search)
+    {
+        return "_" . self::SEARCH_CHARSET . " '%{$search}%' COLLATE " . self::SEARCH_COLLATION;
+    }
+
+    public static function getCollationSafeLike($field, $search)
+    {
+        $needle = self::getSearchNeedle($search);
+        return " (" . self::getSearchFieldAsUtf8($field) . " LIKE {$needle} OR " .
+            self::getBinarySearchFieldAsUtf8($field) . " LIKE {$needle}) ";
+    }
+
+    public static function getCollationSafeRegexp($field, $search)
+    {
+        return " " . self::getBinarySearchFieldAsUtf8($field) .
+            " REGEXP (_" . self::SEARCH_CHARSET . " '\\b{$search}\\b' COLLATE " . self::SEARCH_COLLATION . ") ";
+    }
+
+    public static function getSqlSearchFromPost($searchFieldsNames = [], $connection = "AND", $search = null){
+        $sql = '';
+        $search = isset($search) ? $search : self::getSearchPhraseFromPost();
+
+        if (!empty($search)) {
+            $search = self::escapeSearchPhraseForSQL($search);
+            $searchRegexpSafe = preg_quote($search, '/');
+            $searchRegexpSafe = self::escapeSearchPhraseForSQL($searchRegexpSafe);
+            $like = [];
             foreach ($searchFieldsNames as $value) {
-                $like[] = " {$value} LIKE '%{$search}%' ";
-                // for accent insensitive
-                $like[] = " CONVERT(CAST({$value} as BINARY) USING utf8) LIKE '%{$search}%' ";
+                $like[] = self::getCollationSafeLike($value, $search);
+                if (preg_match('/description/', $value)) {
+                    $like[] = self::getCollationSafeRegexp($value, $searchRegexpSafe);
+                }
             }
-            if(!empty($like)){
+            if (!empty($like)) {
                 $sql .= " {$connection} (". implode(" OR ", $like).")";
-            }else{
+            } else {
                 $sql .= " {$connection} 1=1 ";
             }
         }
-
+        //var_dump($searchFieldsNames, $sql);exit;
         return $sql;
     }
-
 }

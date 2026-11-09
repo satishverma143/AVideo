@@ -1,98 +1,81 @@
 <?php
+//exit;
 header('Content-Type: application/json');
+$closeSessionEarlyIncludeConfig = 1;
 require_once '../../videos/configuration.php';
-session_write_close();
-require_once $global['systemRootPath'] . 'plugin/Live/Objects/LiveTransmition.php';
-require_once $global['systemRootPath'] . 'objects/user.php';
-$p = AVideoPlugin::loadPluginIfEnabled("Live");
+
+/*
+  if(!requestComesFromSafePlace()) {
+  _error_log("Why are you requesting this ".getSelfURI()." ".json_encode($_SERVER));
+  die();
+  }
+ *
+ */
 
 ini_set('max_execution_time', 10);
 set_time_limit(10);
-$obj = new stdClass();
-$obj->error = true;
-$obj->msg = "OFFLINE";
-$obj->nclients = 0;
-if(empty($_POST['name']) && !empty($_GET['name'])){
-    $_POST['name'] = $_GET['name'];
-}else if(empty($_POST['name'])){
-    $_POST['name'] = "undefined";
+// read-only endpoint, polled frequently; release the session lock early so it
+// doesn't queue up behind/behind other requests from the same browser session
+_session_write_close();
+$pobj = AVideoPlugin::getDataObjectIfEnabled("Live");
+if (empty($pobj->server_type->value)) {
+    ini_set('max_execution_time', 180);
+    set_time_limit(180);
 }
-$obj->name = $_POST['name'];
-$obj->applications = array();
-$_GET['lifetime'] = "10";
-if(empty($p)){
-    die(json_encode($obj));
-}
-$xml = $p->getStatsObject();
-$xml = json_encode($xml);
-$xml = json_decode($xml);
-
-$stream = false;
-$lifeStream = array();
-//$obj->server = $xml->server;
-if(!empty($xml->server->application) && !is_array($xml->server->application)){
-    $application = $xml->server->application;
-    $xml->server->application = array();
-    $xml->server->application[] = $application;
-}
-if(!empty($xml->server->application[0]->live->stream)){
-    $lifeStream = $xml->server->application[0]->live->stream;
-    if(!is_array($xml->server->application[0]->live->stream)){
-        $lifeStream = array();
-        $lifeStream[0] = $xml->server->application[0]->live->stream;
-    }
+if (empty($pobj)) {
+    die(json_encode("Plugin disabled"));
 }
 
-require_once $global['systemRootPath'] . 'plugin/AVideoPlugin.php';
-// the live users plugin
-$liveUsersEnabled = AVideoPlugin::isEnabledByName("LiveUsers");
+$timeName = "stats.json.php";
+TimeLogStart($timeName);
+$json = getStatsNotifications();
+//var_dump($json);exit;
+TimeLogEnd($timeName, __LINE__);
+$json = object_to_array($json);
+TimeLogEnd($timeName, __LINE__);
 
-$obj->disableGif = $p->getDisableGifThumbs();
-$obj->countLiveStream = count($lifeStream);
-foreach ($lifeStream as $value){
-    if(!empty($value->name)){
-        $row = LiveTransmition::keyExists($value->name);
-        if(!empty($row) && $value->name === $_POST['name']){
-            $obj->msg = "ONLINE";
-        }
-        if(empty($row) || empty($row['public'])){
-            continue;
-        }
-        
-        $users = false;
-        if($liveUsersEnabled){
-            $filename = $global['systemRootPath'] . 'plugin/LiveUsers/Objects/LiveOnlineUsers.php';
-            if(file_exists($filename)){
-                require_once $filename;
-                $liveUsers = new LiveOnlineUsers(0);
-                $users = $liveUsers->getUsersFromTransmitionKey($value->name);
+if (!empty($_REQUEST['name'])) {
+    TimeLogEnd($timeName, __LINE__);
+    $json['msg'] = 'OFFLINE';
+    $json['name'] = $_REQUEST['name'];
+    if (!empty($json['applications'])) {
+        foreach ($json['applications'] as $value) {
+            if (!empty($value['key']) && $value['key'] == $_REQUEST['name']) {
+                $json['msg'] = 'ONLINE';
+                break;
             }
         }
-        
-        $u = new User($row['users_id']);
-        if($u->getStatus()!=='a'){
-            continue;
-        }
-        
-        $userName = $u->getNameIdentificationBd();
-        $user = $u->getUser();
-        $channelName = $u->getChannelName();
-        $photo = $u->getPhotoDB();
-        $UserPhoto = $u->getPhoto();
-        $obj->applications[] = array("key"=>$value->name, "users"=>$users, "name"=>$userName, "user"=>$user, "photo"=>$photo, "UserPhoto"=>$UserPhoto, "title"=>$row['title'], 'channelName'=>$channelName);
-        if($value->name === $_POST['name']){
-            $obj->error = property_exists($value, 'publishing')?false:true;
-            $obj->msg = (!$obj->error)?"ONLINE":"Waiting for Streamer";
-            $obj->stream = $value;
-            $obj->nclients = intval($value->nclients);
-            break;
+    }
+    TimeLogEnd($timeName, __LINE__);
+    if (!empty($json['hidden_applications'])) {
+        foreach ($json['hidden_applications'] as $value) {
+            if (!empty($value['key']) && $value['key'] == $_REQUEST['name']) {
+                $json['msg'] = 'ONLINE';
+                break;
+            }
         }
     }
+    TimeLogEnd($timeName, __LINE__);
 }
 
-$appArray = AVideoPlugin::getLiveApplicationArray();
-$obj->applications = array_merge($obj->applications, $appArray);
+// hidden_applications is an internal working list of streams the current (possibly anonymous)
+// requester isn't authorized to see - no known JS consumer reads it from this endpoint, so it must
+// not be serialised at all (title/channel/masked-key metadata is still a disclosure otherwise).
+unset($json['hidden_applications']);
 
-echo json_encode($obj);
-
-include $global['systemRootPath'].'objects/include_end.php';
+// applications are publicly listed (unlike hidden_applications above), but a password-protected
+// transmission still requires Live::passwordIsGood() before it can actually be watched - strip the
+// raw key/m3u8 here too unless the caller already satisfied that check (or owns/administers it).
+if (!empty($json['applications'])) {
+    foreach ($json['applications'] as &$app) {
+        if (is_array($app) && !empty($app['isPasswordProtected']) && !empty($app['key'])) {
+            $isOwnStream = User::isLogged() && !empty($app['users_id']) && ((int) $app['users_id'] === (int) User::getId());
+            if (!User::isAdmin() && !$isOwnStream && !Live::passwordIsGood($app['key'])) {
+                unset($app['key'], $app['m3u8']);
+            }
+        }
+    }
+    unset($app);
+}
+//var_dump($json);exit;
+echo json_encode($json);

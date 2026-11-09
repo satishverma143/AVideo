@@ -1,28 +1,28 @@
 <?php
 header('Content-Type: application/json');
 global $global, $config;
-if(!isset($global['systemRootPath'])){
+if (!isset($global['systemRootPath'])) {
     require_once '../videos/configuration.php';
 }
-require_once $global['systemRootPath'] . 'objects/user.php';
 
 $obj = new stdClass();
 $obj->error = true;
-$obj->msg = "";
+$obj->msg = '';
+$obj->clearCache = false;
+$obj->deleteALLCache = false;
+$obj->deleteAllSessionCache = false;
+forbidIfIsUntrustedRequest('configurationClearCache');
+$_SESSION['user']['sessionCache']['getAllCategoriesClearCache'] = 1;
 
-if (!User::isAdmin()) {
-    $obj->msg = __("Permission denied");
-    die(json_encode($obj));
+if (!Permissions::canClearCache() || !empty($_REQUEST['sessionOnly'])) {
+    $obj->deleteAllSessionCache = ObjectYPT::deleteAllSessionCache();
+} else {
+    if (!empty($_REQUEST['FirstPage'])) {
+        $obj->firstPageCache = clearCache(true);
+    } else {
+        $obj->clearCache = clearCache();
+        $obj->deleteALLCache = ObjectYPT::deleteALLCache();
+    }
 }
-$dir = "{$global['systemRootPath']}videos/cache/";
-if(!empty($_GET['FirstPage'])){
-    $dir .= "firstPage/";
-}
-rrmdir($dir);
-$dir = getCacheDir();
-if(!empty($_GET['FirstPage'])){
-    $dir .= "firstPage/";
-}
-rrmdir($dir);
 $obj->error = false;
 die(json_encode($obj));

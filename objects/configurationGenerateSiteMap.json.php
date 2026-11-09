@@ -1,5 +1,4 @@
 <?php
-
 //header("Content-type: text/xml");
 header('Content-Type: application/json');
 global $global, $config;
@@ -11,18 +10,23 @@ require_once $global['systemRootPath'] . 'objects/category.php';
 
 $obj = new stdClass();
 $obj->error = true;
-$obj->msg = "";
+$obj->msg = '';
 
-if (!User::isAdmin()) {
+if (!Permissions::canGenerateSiteMap()) {
     $obj->msg = __("Permission denied");
     die(json_encode($obj));
 }
+forbidIfIsUntrustedRequest('configurationGenerateSiteMap');
 $sitemap = siteMap();
 
-if(!file_put_contents($sitemapFile, $sitemap)){
-    $obj->msg = "We could not save the sitemap";
+if (empty($sitemap)) {
+    $obj->msg = "Sitemap content is empty";
     die(json_encode($obj));
 }
+
+
+$name = "sitemap.xml";
+ObjectYPT::setCache($name, $sitemap);
 
 $obj->error = false;
 die(json_encode($obj));
